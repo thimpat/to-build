@@ -1,0 +1,15 @@
+{
+  "name": "to-build",
+  "version": "1.0.0",
+  "description": "Code Builder",
+  "main": "src/builder.cjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@mycentos.local:thimpat-group/to-build.git"
+  },
+  "author": "Patrice Thimothee",
+  "license": "ISC"
+}
