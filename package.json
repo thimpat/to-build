@@ -11,5 +11,12 @@
     "url": "git@mycentos.local:thimpat-group/to-build.git"
   },
   "author": "Patrice Thimothee",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^8.20.0"
+  },
+  "dependencies": {
+    "minimist": "^1.2.6",
+    "to-esm": "^2.17.0"
+  }
 }
