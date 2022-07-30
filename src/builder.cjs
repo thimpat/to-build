@@ -73,8 +73,9 @@ const getLinks = (content, {tagName = "link", sourceRefName = "href", extraPrope
 {
     try
     {
-        // const regexp = /href=["']([^"'#]+)/gm;
-        const search = `<${tagName}\\b.*${sourceRefName}=["']([^"'#]+).*>`;
+        // <link .*?\bhref\s*=\s*[\"']([^\"'#]+)[\"'].*?>
+        // <script .*?\bsrc\s*=\s*[\"']([^\"'#]+)[\"'].*?>
+        const search = `<${tagName} .*?\\b${sourceRefName}\\s*=\\s*["']([^"']+)["'].*?>`;
         const regexp = new RegExp(search, "gmi");
         const matches = [...content.matchAll(regexp)];
         if (!matches || !matches.length)
@@ -466,7 +467,13 @@ const minifyJs = (solvedSourceAbsolutePath, {
  * @param htmlContent
  * @param minify
  * @param type
- * @returns {null|{uri}}
+ * @param uriProp
+ * @param destFolder
+ * @param htmlContent
+ * @param minify
+ * @param type
+ * @param sourcemaps
+ * @returns {null|{uri, htmlContent}}
  */
 const copyEntity = (uriProp, destFolder, htmlContent, {
     minify = false,
@@ -604,14 +611,14 @@ const copyAssetsFromHTML = (input, outputFolder, {
 
         if (minifyHtml)
         {
-            // htmlContent = minifierHtml(htmlContent, {
-            //     collapseWhitespace   : true,
-            //     continueOnParseError : true,
-            //     keepClosingSlash     : true,
-            //     removeAttributeQuotes: false,
-            //     minifyCss,
-            //     minifyJs
-            // });
+            htmlContent = minifierHtml(htmlContent, {
+                collapseWhitespace   : true,
+                continueOnParseError : true,
+                keepClosingSlash     : true,
+                removeAttributeQuotes: false,
+                minifyCss,
+                minifyJs
+            });
         }
 
         const cssFiles = getCss(htmlContent);
@@ -665,7 +672,6 @@ const generateBuildFolder = (outputFolder, inputs, {
                 sourcemaps
             });
 
-            // copyEntity(htmlPath, outputFolder, {content});
             const targetHtmlPath = joinPath(realOutputFolder, parsed.base);
             fs.writeFileSync(targetHtmlPath, htmlContent, "utf-8");
         }
