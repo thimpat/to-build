@@ -29,7 +29,9 @@ const minifierHtml = require("html-minifier").minify;
 
 const {resolvePath, joinPath} = require("@thimpat/libutils");
 const {getRoots, setRoots} = require("./root-folders.cjs");
+
 const CleanCSS = require("clean-css");
+const UglifyJS = require("uglify-js");
 
 const parseCli = (argv) =>
 {
@@ -261,15 +263,70 @@ const minifyCssContentWithCleanCss = (source, cssMinifyingOptions) =>
     });
 };
 
-const minifyCss = (solvedSourceAbsolutePath, {htmlContent, sourcemaps = false, targetDir, targetName, targetBase, uriProp} = {}) =>
+const updateHtml = (htmlContent, {uri, tag, minifiedUri, targetBase}) =>
 {
     try
     {
-        if (solvedSourceAbsolutePath.indexOf("csshake.css") > -1)
+        const originalUri = uri;
+        uri = makePathRelative(uri);
+        uri = replaceLast(uri, targetBase, minifiedUri);
+
+        let newTag = replaceLast(tag, originalUri, uri);
+        htmlContent = htmlContent.replace(tag, newTag);
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return htmlContent;
+};
+
+const reportResult = ({sourcemaps, minified, uri}) =>
+{
+    try
+    {
+        if (sourcemaps)
         {
-            debugger;
+            console.log(`Minified, source mapped and copied ${uri}`);
+        }
+        else
+        {
+            console.log(`Minified and copied ${uri}`);
         }
 
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
+/**
+ * Minify css file using cleanCss to do the minifying
+ * @param solvedSourceAbsolutePath
+ * @param htmlContent
+ * @param sourcemaps
+ * @param targetDir
+ * @param targetName
+ * @param targetBase
+ * @param uriProp
+ * @returns {null|{content: string, htmlContent: *}}
+ */
+const minifyCss = (solvedSourceAbsolutePath, {
+    htmlContent,
+    sourcemaps = false,
+    targetDir,
+    targetName,
+    targetBase,
+    uriProp
+} = {}) =>
+{
+    try
+    {
         const cssMinifyingOptions = {};
         if (sourcemaps)
         {
@@ -291,7 +348,10 @@ const minifyCss = (solvedSourceAbsolutePath, {htmlContent, sourcemaps = false, t
             content = css.styles;
         }
 
-        let sourceMapOkay;
+
+        let minifiedUri = targetName + ".min.css";
+        const targetPath = joinPath(targetDir, targetName + ".css");
+        const targetPathMinified = joinPath(targetDir, minifiedUri);
         if (css.sourceMap)
         {
             const sourcemapPath = joinPath(targetDir, targetName + ".css.map");
@@ -300,41 +360,19 @@ const minifyCss = (solvedSourceAbsolutePath, {htmlContent, sourcemaps = false, t
             // Write source map
             fs.writeFileSync(sourcemapPath, sourcemapContent, "utf-8");
 
-            sourceMapOkay = true;
-        }
+            // Write original
+            fs.writeFileSync(targetPath, originalContent, "utf-8");
 
-        let minifiedUri = targetName + ".min.css";
-        const targetPath = joinPath(targetDir, targetName + ".css");
-        const targetPathMinified = joinPath(targetDir, minifiedUri);
-        if (sourceMapOkay)
-        {
             content = content + os.EOL + `/*# sourceMappingURL=${targetName}.css.map */`;
         }
 
         // Write minified
         fs.writeFileSync(targetPathMinified, content, "utf-8");
 
-        // Write original
-        fs.writeFileSync(targetPath, originalContent, "utf-8");
-
         let {uri, tag} = uriProp;
-        const originalUri = uri;
-        uri = makePathRelative(uri);
-        // uri = uri.replace(targetBase, minifiedUri);
-        uri = replaceLast(uri, targetBase, minifiedUri);
+        htmlContent = updateHtml(htmlContent, {uri, tag, minifiedUri, targetBase});
 
-        let newTag = replaceLast(tag, originalUri, uri);
-        htmlContent = htmlContent.replace(tag, newTag);
-
-
-        if (sourceMapOkay)
-        {
-            console.log(`Minified, source mapped and copied ${uri}`);
-        }
-        else
-        {
-            console.log(`Minified and copied ${uri}`);
-        }
+        reportResult({sourcemaps: !!css.sourceMap, minified: true, uri});
 
         return {content, htmlContent};
     }
@@ -346,63 +384,71 @@ const minifyCss = (solvedSourceAbsolutePath, {htmlContent, sourcemaps = false, t
     return null;
 };
 
-const minifyJs = (solvedSourceAbsolutePath, {sourcemaps = false, targetDir, targetName, uri} = {}) =>
+/**
+ * Minify .js using uglify-js to do the minifying
+ * @param solvedSourceAbsolutePath
+ * @param sourcemaps
+ * @param targetDir
+ * @param targetName
+ * @param uri
+ * @returns {{content: string}|null}
+ */
+const minifyJs = (solvedSourceAbsolutePath, {
+    htmlContent,
+    sourcemaps = false,
+    targetDir,
+    targetName,
+    targetBase,
+    uriProp
+} = {}) =>
 {
     try
     {
+        let minifiedUri = targetName + ".min.js";
+        const targetPath = joinPath(targetDir, targetName + ".js");
+        const targetPathMinified = joinPath(targetDir, minifiedUri);
+        const sourcemapPath = joinPath(targetDir, targetName + ".js.map");
+
         const jsMinifyingOptions = {};
         if (sourcemaps)
         {
-            jsMinifyingOptions.sourceMap = true;
-            jsMinifyingOptions.rebaseTo = targetDir;
+            jsMinifyingOptions.sourceMap = {
+                filename: targetBase,
+                url     : targetName + ".js.map"
+            };
         }
-
-        let content = "";
 
         const originalContent = fs.readFileSync(solvedSourceAbsolutePath, "utf-8");
-        const css = new CleanCSS(jsMinifyingOptions).minify(originalContent);
+        const result = UglifyJS.minify(originalContent, jsMinifyingOptions);
 
-        // CSS minifying was successful
-        if (css && css.styles)
+        if (result.error)
         {
-            content = css.styles;
+            console.error(result.error);
+            return null;
         }
 
-        let sourceMapOkay;
-        if (css.sourceMap)
-        {
-            const sourcemapPath = joinPath(targetDir, targetName + ".css.map");
-            const sourcemapContent = css.sourceMap.toString();
-
-            // Write source map
-            fs.writeFileSync(sourcemapPath, sourcemapContent, "utf-8");
-
-            sourceMapOkay = true;
-        }
-
-        const targetPath = joinPath(targetDir, targetName + ".css");
-        const targetPathMinified = joinPath(targetDir, targetName + ".min.css");
-        if (sourceMapOkay)
-        {
-            content = content + os.EOL + `/*# sourceMappingURL=${targetName}.css.map */`;
-        }
+        const content = result.code;
 
         // Write minified
         fs.writeFileSync(targetPathMinified, content, "utf-8");
 
-        // Write original
-        fs.writeFileSync(targetPath, originalContent, "utf-8");
-
-        if (sourceMapOkay)
+        if (result.map)
         {
-            console.log(`Minified, source mapped and copied ${uri}`);
-        }
-        else
-        {
-            console.log(`Minified and copied ${uri}`);
+            const sourcemapContent = result.map;
+
+            // Write source map
+            fs.writeFileSync(sourcemapPath, sourcemapContent, "utf-8");
+
+            // Write original
+            fs.writeFileSync(targetPath, originalContent, "utf-8");
         }
 
-        return {content};
+        let {uri, tag} = uriProp;
+        htmlContent = updateHtml(htmlContent, {uri, tag, minifiedUri, targetBase});
+
+        reportResult({sourcemaps: !!sourcemaps, minified: true, uri});
+
+        return {content, htmlContent};
     }
     catch (e)
     {
@@ -425,8 +471,7 @@ const minifyJs = (solvedSourceAbsolutePath, {sourcemaps = false, targetDir, targ
 const copyEntity = (uriProp, destFolder, htmlContent, {
     minify = false,
     type = undefined,
-    sourcemaps = false,
-    cssMinifyingOptions = {}
+    sourcemaps = false
 } = {}) =>
 {
     try
@@ -441,7 +486,6 @@ const copyEntity = (uriProp, destFolder, htmlContent, {
             return null;
         }
 
-
         // Create target folder
         let targetPath = joinPath(destFolder, uri);
         const infoPath = path.parse(targetPath);
@@ -451,13 +495,14 @@ const copyEntity = (uriProp, destFolder, htmlContent, {
         }
 
         let processedAlready = false;
+        let res;
 
         // Minify
         if (minify)
         {
             if (type === "css")
             {
-                const res = minifyCss(solvedSourceAbsolutePath, {
+                res = minifyCss(solvedSourceAbsolutePath, {
                     htmlContent,
                     sourcemaps,
                     targetDir : infoPath.dir,
@@ -465,28 +510,25 @@ const copyEntity = (uriProp, destFolder, htmlContent, {
                     targetBase: infoPath.base,
                     uriProp
                 });
-
-                if (res)
-                {
-                    htmlContent = res.htmlContent;
-                    processedAlready = true;
-                }
-
             }
-            else if (type === "js");
+            else if (type === "js")
             {
-                // minifyJs(solvedSourceAbsolutePath, {
-                //     htmlContent,
-                //     sourcemaps,
-                //     targetDir : infoPath.dir,
-                //     targetName: infoPath.name,
-                //     uriProp
-                // });
-                //
-                // processedAlready = true;
+                res = minifyJs(solvedSourceAbsolutePath, {
+                    htmlContent,
+                    sourcemaps,
+                    targetDir : infoPath.dir,
+                    targetName: infoPath.name,
+                    targetBase: infoPath.base,
+                    uriProp
+                });
+            }
+
+            if (res)
+            {
+                htmlContent = res.htmlContent;
+                processedAlready = true;
             }
         }
-
 
         if (!processedAlready)
         {
