@@ -28,7 +28,7 @@ const stripHtmlComments = require("strip-html-comments");
 const minifierHtml = require("html-minifier").minify;
 
 const {resolvePath, joinPath} = require("@thimpat/libutils");
-const {getRoots, setRoots} = require("./root-folders.cjs");
+const {setRoots} = require("./source-finder.cjs");
 
 const CleanCSS = require("clean-css");
 const UglifyJS = require("uglify-js");
@@ -73,6 +73,12 @@ const getBooleanOptionValue = (cli, optionName, defaultValue = false) =>
 
 /**
  *
+ * @param content
+ * @param tagName
+ * @param sourceRefName
+ * @param extraProperty
+ * @param category
+ * @returns {*}
  */
 const extractEntities = (content, {
     tagName = "link",
@@ -90,7 +96,7 @@ const extractEntities = (content, {
         const matches = [...content.matchAll(regexp)];
         if (!matches || !matches.length)
         {
-            return {content, entities: []};
+            return content;
         }
 
         let regexpProp = null;
@@ -115,7 +121,11 @@ const extractEntities = (content, {
             const uri = match[1];
             const replacement = `${category}(${counter}, ${uri})`;
 
-            addEntity(category, {tag, uri, replacement});
+            const added = addEntity(category, {tag, uri, replacement});
+            if (!added)
+            {
+                continue;
+            }
 
             content = content.replace(tag, replacement);
         }
@@ -130,39 +140,6 @@ const extractEntities = (content, {
     return content;
 };
 
-const lookupSourcePath = (source) =>
-{
-    try
-    {
-        const lookupFolders = getRoots();
-
-        for (let i = 0; i < lookupFolders.length; ++i)
-        {
-            const rootFolder = lookupFolders[i];
-            if (!source)
-            {
-                debugger;
-            }
-            const sourcePath = joinPath(rootFolder, source);
-
-            if (!sourcePath)
-            {
-                debugger;
-            }
-
-            if (fs.existsSync(sourcePath))
-            {
-                return sourcePath;
-            }
-        }
-    }
-    catch (e)
-    {
-        console.error({lid: 1001}, e.message);
-    }
-
-    return null;
-};
 
 const addMinExtension = (uri) =>
 {
@@ -253,14 +230,18 @@ const minifyCssContentWithCleanCss = (source, cssMinifyingOptions) =>
     });
 };
 
-const updateHtml = (htmlContent, {entity, minifiedUri, targetBase}) =>
+const updateHtml = (htmlContent, {entity, minifiedUri = null, targetBase}) =>
 {
     try
     {
         let {uri, tag, replacement} = entity;
         const originalUri = uri;
         uri = makePathRelative(uri);
-        uri = replaceLast(uri, targetBase, minifiedUri);
+
+        if (minifiedUri)
+        {
+            uri = replaceLast(uri, targetBase, minifiedUri);
+        }
 
         let newTag = replaceLast(tag, originalUri, uri);
         htmlContent = htmlContent.replace(replacement, newTag);
@@ -273,20 +254,35 @@ const updateHtml = (htmlContent, {entity, minifiedUri, targetBase}) =>
     return htmlContent;
 };
 
-const reportResult = ({sourcemaps, minified, entity}) =>
+const reportResult = ({sourcemaps = false, minified = false, bundled = false, entity} = {}) =>
 {
     try
     {
-        let {uri} = entity;
+        const properties = [];
+        if (bundled)
+        {
+            properties.push("bundled");
+        }
+
+        if (minified)
+        {
+            properties.push("minified");
+        }
 
         if (sourcemaps)
         {
-            console.log(`Minified, source mapped and copied ${uri}`);
+            properties.push("source mapped");
         }
-        else
+
+        let str = "";
+        if (properties.length)
         {
-            console.log(`Minified and copied ${uri}`);
+            str = properties.join(", ") + " and ";
         }
+
+        let sentence = `${str}copied ${entity.uri}`;
+        sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+        console.log(sentence);
 
         return true;
     }
@@ -461,16 +457,16 @@ const minifyEsm = async (solvedSourceAbsolutePath, {
     try
     {
         let minifiedUri = targetName + ".min.js";
-        const targetPath = joinPath(targetDir, targetName + ".js");
         const targetPathMinified = joinPath(targetDir, minifiedUri);
-        const sourcemapPath = joinPath(targetDir, targetName + ".js.map");
 
         const esmOptions = {
             input           : solvedSourceAbsolutePath,
-            output          : targetDir,
             noheader        : true,
             target          : TARGET.BROWSER,
+            onlyBundle      : true,
             "bundle-browser": targetPathMinified,
+            keepExternal    : true,
+            resolveAbsolute : ["./node_modules"]
         };
 
         if (sourcemaps)
@@ -487,7 +483,32 @@ const minifyEsm = async (solvedSourceAbsolutePath, {
 
         htmlContent = updateHtml(htmlContent, {entity, minifiedUri, targetBase});
 
-        reportResult({sourcemaps: !!sourcemaps, minified: true, entity});
+        reportResult({sourcemaps: !!sourcemaps, minified: true, bundled: true, entity});
+
+        return {htmlContent};
+    }
+    catch (e)
+    {
+        console.error({lid: 1029}, e.message);
+    }
+
+    return null;
+};
+
+const copyGeneric = (solvedSourceAbsolutePath, {
+    htmlContent,
+    targetPath,
+    targetDir,
+    targetName,
+    targetBase,
+    entity
+} = {}) =>
+{
+    try
+    {
+        fs.copyFileSync(solvedSourceAbsolutePath, targetPath);
+        htmlContent = updateHtml(htmlContent, {entity, targetBase});
+        reportResult({entity});
 
         return {htmlContent};
     }
@@ -511,7 +532,7 @@ const minifyEsm = async (solvedSourceAbsolutePath, {
  * @param htmlContent
  * @param minify
  * @param sourcemaps
- * @returns {null|{uri, htmlContent}}
+ * @returns {Promise<null|{uri, htmlContent}>}
  */
 const copyEntity = async (entity, destFolder, htmlContent, {
     minify = false,
@@ -520,13 +541,11 @@ const copyEntity = async (entity, destFolder, htmlContent, {
 {
     try
     {
-        let {uri, category} = entity;
+        let {uri, category, sourcePath} = entity;
 
-        // Look for uri in various folders (root folder defined by user like node_modules)
-        let solvedSourceAbsolutePath = lookupSourcePath(uri);
-        if (!solvedSourceAbsolutePath)
+        if (!sourcePath)
         {
-            console.error(`Could not find ${uri}`);
+            console.error(`Could not find local path for ${uri}`);
             return null;
         }
 
@@ -545,7 +564,7 @@ const copyEntity = async (entity, destFolder, htmlContent, {
         {
             if (category === CATEGORY.CSS)
             {
-                res = minifyCss(solvedSourceAbsolutePath, {
+                res = minifyCss(sourcePath, {
                     htmlContent,
                     sourcemaps,
                     targetDir : infoPath.dir,
@@ -556,7 +575,7 @@ const copyEntity = async (entity, destFolder, htmlContent, {
             }
             else if (category === CATEGORY.SCRIPT)
             {
-                res = minifyJs(solvedSourceAbsolutePath, {
+                res = minifyJs(sourcePath, {
                     htmlContent,
                     sourcemaps,
                     targetDir : infoPath.dir,
@@ -567,27 +586,31 @@ const copyEntity = async (entity, destFolder, htmlContent, {
             }
             else if (category === CATEGORY.ESM)
             {
-                res = await minifyEsm(solvedSourceAbsolutePath, {
+                res = await minifyEsm(sourcePath, {
                     htmlContent,
                     sourcemaps,
+                    destFolder,
                     targetDir : infoPath.dir,
                     targetName: infoPath.name,
                     targetBase: infoPath.base,
                     entity
                 });
             }
-
-            if (res)
-            {
-                htmlContent = res.htmlContent;
-            }
         }
-
-        if (!res)
+        else
         {
-            fs.copyFileSync(solvedSourceAbsolutePath, targetPath);
-            console.log(`Verbatim copied ${uri}`);
+            // CATEGORY.GENERIC, CATEGORY.MEDIAS, CATEGORY.METAS
+            res = copyGeneric(sourcePath, {
+                htmlContent,
+                targetPath,
+                targetDir : infoPath.dir,
+                targetName: infoPath.name,
+                targetBase: infoPath.base,
+                entity
+            });
         }
+
+        htmlContent = res.htmlContent;
 
         return {uri, htmlContent};
     }
