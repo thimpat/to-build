@@ -73,15 +73,22 @@ const getBooleanOptionValue = (cli, optionName, defaultValue = false) =>
 };
 
 /**
- *
- * @param content
- * @param tagName
- * @param sourceRefName
- * @param extraProperty
- * @param category
+ * Extract uris from the given source code and create some objects from them
+ * @param {string} content Source code to parse
+ * @param {string} search String for the regex that will do the search. The regex must contain
+ * one subgroup that points to the url to extract to be valid. When search is defined, the internal
+ * generated regex is ignored.
+ * @param referenceDir
+ * @param {string} tagName Tag to extract the uri source from (can be a regex string)
+ * @param {string} sourceRefName Property that contains the uri to register
+ * @param {string} extraProperty When the tag is detected, we can check whether a property is there to narrow down
+ * the selection. (can be a regex string)
+ * @param {CATEGORY_TYPE} category
  * @returns {*}
  */
 const extractEntities = (content, {
+    search = "",
+    referenceDir = "",
     tagName = "link",
     sourceRefName = "href",
     extraProperty = null,
@@ -92,7 +99,7 @@ const extractEntities = (content, {
     {
         category = category || tagName + "_" + sourceRefName;
 
-        const search = `<${tagName} .*?\\b${sourceRefName}\\s*=\\s*["']([^"']+)["'].*?>(<\/${tagName}>)?`;
+        search = search || `<${tagName} .*?\\b${sourceRefName}\\s*=\\s*["']([^"']+)["'].*?>(<\/${tagName}>)?`;
         const regexp = new RegExp(search, "gmi");
         const matches = [...content.matchAll(regexp)];
         if (!matches || !matches.length)
@@ -122,7 +129,7 @@ const extractEntities = (content, {
             const uri = match[1];
             const replacement = `${category}(${counter}, ${uri})`;
 
-            const added = addEntity(category, {tag, uri, replacement});
+            const added = addEntity(category, {tag, uri, replacement}, referenceDir);
             if (!added)
             {
                 continue;
@@ -204,31 +211,6 @@ const makePathRelative = (newUri) =>
     }
 
     return newUri;
-};
-
-const minifyCssContentWithCleanCss = (source, cssMinifyingOptions) =>
-{
-    return new Promise((resolve, reject) =>
-    {
-        try
-        {
-            const fileContent = fs.readFileSync(source, "utf-8");
-            const ttt = new CleanCSS(cssMinifyingOptions).minify(fileContent);
-
-            new CleanCSS(cssMinifyingOptions).minify(fileContent, function (error, output)
-            {
-                resolve(output);
-                // access output.sourceMap for SourceMapGenerator object
-                // see https://github.com/mozilla/source-map/#sourcemapgenerator for more details
-            });
-        }
-        catch (e)
-        {
-            console.error({lid: 1019}, e.message);
-            reject(e);
-        }
-
-    });
 };
 
 const updateHtml = (htmlContent, {entity, minifiedUri = null, targetBase}) =>
@@ -327,6 +309,16 @@ const minifyCss = (solvedSourceAbsolutePath, {
         let content = "";
 
         const originalContent = fs.readFileSync(solvedSourceAbsolutePath, "utf-8");
+
+        // ------------
+        const referenceDir = path.parse(solvedSourceAbsolutePath).dir;
+        extractEntities(originalContent, {
+            search       : "url\\([\"']?([^\"']+)[\"']?\\)",
+            category     : CATEGORY.GENERIC,
+            referenceDir
+        });
+        // ------------
+
         const css = new CleanCSS(cssMinifyingOptions).minify(originalContent);
 
         // css.warnings && css.warnings.length && console.log(css.warnings.join(os.EOL));
@@ -725,6 +717,13 @@ const copyAssetsFromHTML = async (input, outputFolder, {
             tagName      : "\\w+",
             sourceRefName: "src",
             category     : CATEGORY.MEDIAS
+        });
+
+        const referenceDir = path.parse(htmlContent).dir;
+        extractEntities(htmlContent, {
+            search       : "url\\([\"']?([^\"']+)[\"']?\\)",
+            category     : CATEGORY.GENERIC,
+            referenceDir
         });
 
         htmlContent = await copyEntities(CATEGORY.CSS, outputFolder, {htmlContent, minify: minifyCss, sourcemaps});

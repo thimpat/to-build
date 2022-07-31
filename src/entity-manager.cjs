@@ -1,7 +1,17 @@
+
+const fs = require("fs");
+
+const {joinPath} = require("@thimpat/libutils");
+
 const {lookupSourcePath, getPathName} = require("./source-finder.cjs");
+
 const lookup = {};
 const entities = {};
 
+/**
+ * @typedef CATEGORY_TYPE
+ * @type {{CSS: string, SCRIPT: string, GENERIC: string, METAS: string, ESM: string, MEDIAS: string}}
+ */
 const CATEGORY = {
     CSS    : "css",
     SCRIPT : "script",
@@ -22,7 +32,7 @@ const isUrl = string => {
     catch(e){ return false; }
 };
 
-const addEntity = (category, entity) =>
+const addEntity = (category, entity, referenceDir = "") =>
 {
     try
     {
@@ -47,16 +57,33 @@ const addEntity = (category, entity) =>
             entity.pathname = validPathname;
         }
 
-        const resLookups = lookupSourcePath(entity.pathname || entity.uri);
-        if (!resLookups)
+        let resLookups;
+        if (referenceDir)
         {
-            if (entity.uri.indexOf("#") > -1)
+            const sourcePath = joinPath(referenceDir, entity.pathname);
+            if (!fs.existsSync(sourcePath))
             {
+                console.error(`Could not find [${entity.pathname}]`);
                 return false;
             }
+            resLookups = {
+                rootFolder: referenceDir,
+                sourcePath
+            };
+        }
+        else
+        {
+            resLookups = lookupSourcePath(entity.pathname || entity.uri);
+            if (!resLookups)
+            {
+                if (entity.uri.indexOf("#") > -1)
+                {
+                    return false;
+                }
 
-            console.error(`Could not find local matching path for [${entity.uri}]. Skipping`);
-            return false;
+                console.error(`Could not find local matching path for [${entity.uri}]. Skipping`);
+                return false;
+            }
         }
 
         const {rootFolder, sourcePath} = resLookups;
