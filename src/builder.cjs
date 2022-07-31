@@ -842,6 +842,48 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
     return false;
 };
 
+const startServers = async (realOutputFolder) =>
+{
+    try
+    {
+        // Start server for development
+        const devDirs = getRoots();
+        devDirs.push(...getStaticDirs());
+        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port: 10000}))
+        {
+            console.error(`Failed to start the development server`);
+        }
+
+        // Start server for staging
+        const stagingDirs = [];
+        stagingDirs.push(realOutputFolder);
+        stagingDirs.push(...getStaticDirs());
+
+        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port: 10002}))
+        {
+            console.error(`Failed to start the staging server`);
+        }
+
+        // Start server for production
+        const productionDirs = [];
+        productionDirs.push(realOutputFolder);
+        productionDirs.push(...getStaticDirs());
+
+        if (!await startServer({name: "production", dirs: productionDirs, dynDirs: ["dynamic"], port: 10004}))
+        {
+            console.error(`Failed to start the production server`);
+        }
+
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
 (async function init()
 {
     try
@@ -891,24 +933,10 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
 
         setStaticDirs(cli.static);
 
-        // Server for development
-        const devDirs = getRoots();
-        devDirs.push(...getStaticDirs());
-        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port: 10000}))
-        {
-            console.error(`Failed to start the development server`);
-        }
-
-        // Server for staging
-        // Start server
-        const stagingDirs = [];
-        stagingDirs.push(realOutputFolder);
-        stagingDirs.push(...getStaticDirs());
-
-        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port: 10002}))
-        {
-            console.error(`Failed to start the staging server`);
-        }
+        // ---------------------------------------------
+        // Start servers
+        // ---------------------------------------------
+        await startServers(realOutputFolder);
 
     }
     catch (e)
