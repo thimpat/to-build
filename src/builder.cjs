@@ -701,7 +701,7 @@ const copyAssetsFromHTML = async (input, outputFolder, {
 
         // GENERIC
         htmlContent = extractEntities(htmlContent, {
-            tagName      : "link",
+            tagName      : "\\w+",
             sourceRefName: "href",
             category     : CATEGORY.GENERIC
         });
@@ -721,8 +721,16 @@ const copyAssetsFromHTML = async (input, outputFolder, {
             category     : CATEGORY.SCRIPT
         });
 
+        // MEDIAS
+        htmlContent = extractEntities(htmlContent, {
+            tagName      : "\\w+",
+            sourceRefName: "src",
+            category     : CATEGORY.MEDIAS
+        });
+
         htmlContent = await copyEntities(CATEGORY.CSS, outputFolder, {htmlContent, minify: minifyCss, sourcemaps});
         htmlContent = await copyEntities(CATEGORY.GENERIC, outputFolder, {htmlContent});
+        htmlContent = await copyEntities(CATEGORY.MEDIAS, outputFolder, {htmlContent});
         htmlContent = await copyEntities(CATEGORY.ESM, outputFolder, {htmlContent, minify: minifyJs, sourcemaps});
         htmlContent = await copyEntities(CATEGORY.SCRIPT, outputFolder, {htmlContent, minify: minifyJs, sourcemaps});
 
