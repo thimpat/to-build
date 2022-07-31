@@ -497,6 +497,19 @@ const copyGeneric = (solvedSourceAbsolutePath, {
 {
     try
     {
+        if (solvedSourceAbsolutePath.indexOf("manifest.json") > -1)
+        {
+            // ------------
+            const content = fs.readFileSync(solvedSourceAbsolutePath, "utf-8");
+            const referenceDir = path.parse(solvedSourceAbsolutePath).dir;
+            extractEntities(content, {
+                search       : `"src"\\s*:\\s*"([^"]+)"`,
+                category     : CATEGORY.EXTRAS,
+                referenceDir
+            });
+            // ------------
+        }
+
         fs.copyFileSync(solvedSourceAbsolutePath, targetPath);
         htmlContent = updateHtml(htmlContent, {entity, targetBase});
         reportResult({entity});
@@ -590,7 +603,7 @@ const copyEntity = async (entity, destFolder, htmlContent, {
         }
         else
         {
-            // CATEGORY.GENERIC, CATEGORY.MEDIAS, CATEGORY.METAS
+            // CATEGORY.GENERIC, CATEGORY.MEDIAS, CATEGORY.EXTRAS
             res = copyGeneric(sourcePath, {
                 htmlContent,
                 targetPath,
@@ -719,18 +732,23 @@ const copyAssetsFromHTML = async (input, outputFolder, {
             category     : CATEGORY.MEDIAS
         });
 
-        const referenceDir = path.parse(htmlContent).dir;
+        const referenceDir = path.parse(input).dir;
         extractEntities(htmlContent, {
             search       : "url\\([\"']?([^\"']+)[\"']?\\)",
             category     : CATEGORY.GENERIC,
             referenceDir
         });
 
+
+
         htmlContent = await copyEntities(CATEGORY.CSS, outputFolder, {htmlContent, minify: minifyCss, sourcemaps});
         htmlContent = await copyEntities(CATEGORY.GENERIC, outputFolder, {htmlContent});
         htmlContent = await copyEntities(CATEGORY.MEDIAS, outputFolder, {htmlContent});
         htmlContent = await copyEntities(CATEGORY.ESM, outputFolder, {htmlContent, minify: minifyJs, sourcemaps});
         htmlContent = await copyEntities(CATEGORY.SCRIPT, outputFolder, {htmlContent, minify: minifyJs, sourcemaps});
+
+        // Extra files discovered during process i.e. manifest.json
+        await copyEntities(CATEGORY.EXTRAS, outputFolder, {htmlContent});
 
         return htmlContent;
     }

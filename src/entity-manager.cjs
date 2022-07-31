@@ -10,14 +10,14 @@ const entities = {};
 
 /**
  * @typedef CATEGORY_TYPE
- * @type {{CSS: string, SCRIPT: string, GENERIC: string, METAS: string, ESM: string, MEDIAS: string}}
+ * @type {{CSS: string, SCRIPT: string, GENERIC: string, EXTRAS: string, ESM: string, MEDIAS: string}}
  */
 const CATEGORY = {
     CSS    : "css",
     SCRIPT : "script",
     ESM    : "esm",
     GENERIC: "generic",
-    METAS  : "metas",
+    EXTRAS : "extras",
     MEDIAS : "medias"
 };
 
