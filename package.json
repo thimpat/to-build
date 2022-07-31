@@ -25,7 +25,7 @@
     "html-minifier": "^4.0.0",
     "minimist": "^1.2.6",
     "strip-html-comments": "^1.0.0",
-    "to-esm": "^2.17.0",
+    "to-esm": "^2.18.0",
     "uglify-js": "^3.16.3"
   }
 }
