@@ -4,9 +4,12 @@ const fs = require("fs");
 const {resolvePath, joinPath} = require("@thimpat/libutils");
 
 let rootFolders = [];
+let staticFolders = [];
 
 /**
- * Define directories where the assets will be look for
+ * Define directories where the assets will be looked for
+ * The directory where the html being parsed is the default
+ * node_modules/ is also part of it
  * @param htmlPath
  * @param roots
  * @returns {boolean}
@@ -53,7 +56,7 @@ const setRoots = (htmlPath, roots ) =>
         let cwd = process.cwd();
         cwd = resolvePath(cwd);
 
-        rootFolders.push(cwd);
+        // rootFolders.push(cwd);
 
         // Add the node_modules directory to the lookup path list
         const nodeModulePath = joinPath(cwd, "node_modules");
@@ -77,6 +80,56 @@ const setRoots = (htmlPath, roots ) =>
 const getRoots = () =>
 {
     return rootFolders;
+};
+
+const setStaticDirs = (dirs) =>
+{
+    try
+    {
+        if (!dirs)
+        {
+            return [];
+        }
+
+        if (!Array.isArray(dirs))
+        {
+            if (dirs.indexOf(",") > -1)
+            {
+                dirs = dirs.split(",");
+            }
+            else
+            {
+                dirs = [dirs];
+            }
+        }
+
+        for (let i = 0; i < dirs.length; ++i)
+        {
+            let dir = dirs[i];
+            dir = resolvePath(dir);
+
+            if (!dir)
+            {
+                continue;
+            }
+
+            staticFolders.push(dir);
+        }
+
+        staticFolders = [...new Set(staticFolders)];
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
+const getStaticDirs = () =>
+{
+    return staticFolders;
 };
 
 const getPathName = (uri) =>
@@ -148,5 +201,9 @@ const lookupSourcePath = (uri) =>
 
 module.exports.setRoots = setRoots;
 module.exports.getRoots = getRoots;
+
+module.exports.setStaticDirs = setStaticDirs;
+module.exports.getStaticDirs = getStaticDirs;
+
 module.exports.getPathName = getPathName;
 module.exports.lookupSourcePath = lookupSourcePath;

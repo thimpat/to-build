@@ -28,7 +28,7 @@ const stripHtmlComments = require("strip-html-comments");
 const minifierHtml = require("html-minifier").minify;
 
 const {resolvePath, joinPath} = require("@thimpat/libutils");
-const {setRoots, getRoots} = require("./source-finder.cjs");
+const {setRoots, getRoots, setStaticDirs, getStaticDirs} = require("./source-finder.cjs");
 
 const CleanCSS = require("clean-css");
 const UglifyJS = require("uglify-js");
@@ -787,7 +787,7 @@ const generateBuild = async (outputFolder, htmlPath, {
     return null;
 };
 
-const stopServer = async ({dirs = [], namespace = "to-build", name = "staging", port = 10002, dynDirs = []} = {}) =>
+const stopServer = async ({namespace = "to-build", name = "staging"} = {}) =>
 {
     try
     {
@@ -809,7 +809,7 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
 {
     try
     {
-        if (!await stopServer())
+        if (!await stopServer({namespace, name}))
         {
             console.error(`Could not stop running server. Re-using the same one`);
         }
@@ -871,12 +871,27 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
             });
         }
 
-        // Start server
-        const dirs = [];
-        dirs.push(realOutputFolder);
-        dirs.push(cli.public);
+        setStaticDirs(cli.static);
 
-        await startServer({dirs, dynDirs: ["dynamic"]});
+        // Server for development
+        const devDirs = getRoots();
+        devDirs.push(...getStaticDirs());
+        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port: 10000}))
+        {
+            console.error(`Failed to start the development server`);
+        }
+
+        // Server for staging
+        // Start server
+        const stagingDirs = [];
+        stagingDirs.push(realOutputFolder);
+        stagingDirs.push(...getStaticDirs());
+
+        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port: 10002}))
+        {
+            console.error(`Failed to start the staging server`);
+        }
+
     }
     catch (e)
     {
