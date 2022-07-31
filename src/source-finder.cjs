@@ -1,27 +1,42 @@
-const {resolvePath, joinPath} = require("@thimpat/libutils");
+const path = require("path");
 const fs = require("fs");
+
+const {resolvePath, joinPath} = require("@thimpat/libutils");
 
 let rootFolders = [];
 
 /**
  * Define directories where the assets will be look for
+ * @param htmlPath
  * @param roots
  * @returns {boolean}
  */
-const setRoots = (roots) =>
+const setRoots = (htmlPath, roots ) =>
 {
     try
     {
-        if (!roots)
+        rootFolders = [];
+        roots = roots || [];
+        if (!Array.isArray(roots))
         {
-            roots = [];
-        }
-        else if (!Array.isArray(roots))
-        {
-            roots = roots.split(",")[0];
+            if (roots.indexOf(",") > -1)
+            {
+                roots = roots.split(",")[0];
+            }
+            else
+            {
+                roots = [roots];
+            }
         }
 
-        rootFolders = [];
+        // Add the index.html file directory to the lookup root list
+        let htmlPathFolder = path.parse(htmlPath).dir;
+        if (htmlPathFolder)
+        {
+            htmlPathFolder = resolvePath(htmlPathFolder);
+            rootFolders.unshift(htmlPathFolder);
+        }
+
         for (let i = 0; i < roots.length; ++i)
         {
             let root = roots[i].trim();
@@ -38,7 +53,7 @@ const setRoots = (roots) =>
         let cwd = process.cwd();
         cwd = resolvePath(cwd);
 
-        rootFolders.unshift(cwd);
+        rootFolders.push(cwd);
 
         // Add the node_modules directory to the lookup path list
         const nodeModulePath = joinPath(cwd, "node_modules");
@@ -46,6 +61,8 @@ const setRoots = (roots) =>
         {
             rootFolders.push(nodeModulePath);
         }
+
+        rootFolders = [...new Set(rootFolders)];
 
         return true;
     }

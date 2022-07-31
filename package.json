@@ -22,6 +22,7 @@
   "dependencies": {
     "@thimpat/libutils": "^1.4.2",
     "clean-css": "^4.2.4",
+    "genserve": "^2.0.3-beta.0",
     "html-minifier": "^4.0.0",
     "minimist": "^1.2.6",
     "strip-html-comments": "^1.0.0",

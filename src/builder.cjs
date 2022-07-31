@@ -28,7 +28,7 @@ const stripHtmlComments = require("strip-html-comments");
 const minifierHtml = require("html-minifier").minify;
 
 const {resolvePath, joinPath} = require("@thimpat/libutils");
-const {setRoots} = require("./source-finder.cjs");
+const {setRoots, getRoots} = require("./source-finder.cjs");
 
 const CleanCSS = require("clean-css");
 const UglifyJS = require("uglify-js");
@@ -36,6 +36,7 @@ const UglifyJS = require("uglify-js");
 const {TARGET, transpileFiles} = require("to-esm");
 
 const {CATEGORY, addEntity, getEntities} = require("./entity-manager.cjs");
+const {startGenServer, stopGenServer, infoGenServer, isGenserverUp} = require("genserve");
 
 
 const parseCli = (argv) =>
@@ -498,8 +499,6 @@ const minifyEsm = async (solvedSourceAbsolutePath, {
 const copyGeneric = (solvedSourceAbsolutePath, {
     htmlContent,
     targetPath,
-    targetDir,
-    targetName,
     targetBase,
     entity
 } = {}) =>
@@ -748,13 +747,14 @@ const copyAssetsFromHTML = async (input, outputFolder, {
  *
  * @param outputFolder
  * @param inputs
+ * @param htmlPath
  * @param minifyHtml
  * @param minifyCss
  * @param minifyJs
  * @param sourcemaps
  * @returns {Promise<boolean>}
  */
-const generateBuild = async (outputFolder, inputs, {
+const generateBuild = async (outputFolder, htmlPath, {
     minifyHtml = false,
     minifyCss = false,
     minifyJs = false,
@@ -765,29 +765,61 @@ const generateBuild = async (outputFolder, inputs, {
     {
         fs.mkdirSync(outputFolder, {recursive: true});
 
-        for (let i = 0; i < inputs.length; ++i)
-        {
-            const htmlPath = inputs[i];
+        const parsed = path.parse(htmlPath);
 
-            const parsed = path.parse(htmlPath);
+        const realOutputFolder = path.isAbsolute(parsed.dir) ? resolvePath(outputFolder) : joinPath(outputFolder, parsed.dir);
+        const htmlContent = await copyAssetsFromHTML(htmlPath, realOutputFolder, {
+            minifyHtml,
+            minifyCss,
+            minifyJs,
+            sourcemaps
+        });
 
-            const realOutputFolder = path.isAbsolute(parsed.dir) ? resolvePath(outputFolder) : joinPath(outputFolder, parsed.dir);
-            const htmlContent = await copyAssetsFromHTML(htmlPath, realOutputFolder, {
-                minifyHtml,
-                minifyCss,
-                minifyJs,
-                sourcemaps
-            });
+        const targetHtmlPath = joinPath(realOutputFolder, parsed.base);
+        fs.writeFileSync(targetHtmlPath, htmlContent, "utf-8");
 
-            const targetHtmlPath = joinPath(realOutputFolder, parsed.base);
-            fs.writeFileSync(targetHtmlPath, htmlContent, "utf-8");
-        }
-
-        return true;
+        return realOutputFolder;
     }
     catch (e)
     {
         console.error({lid: 1017}, e.message);
+    }
+
+    return null;
+};
+
+const stopServer = async ({dirs = [], namespace = "to-build", name = "staging", port = 10002, dynDirs = []} = {}) =>
+{
+    try
+    {
+        const isServerUp = await isGenserverUp({namespace, name});
+        if (isServerUp)
+        {
+            return await stopGenServer({namespace, name});
+        }
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
+const startServer = async ({dirs = [], namespace = "to-build", name = "staging", port = 10002, dynDirs = []} = {}) =>
+{
+    try
+    {
+        if (!await stopServer())
+        {
+            console.error(`Could not stop running server. Re-using the same one`);
+        }
+
+        return await startGenServer({namespace, name, port, dirs, dynDirs});
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
     }
 
     return false;
@@ -795,7 +827,6 @@ const generateBuild = async (outputFolder, inputs, {
 
 (async function init()
 {
-
     try
     {
         const cli = parseCli(process.argv);
@@ -816,16 +847,37 @@ const generateBuild = async (outputFolder, inputs, {
         let outputFolder = cli.output || "./out";
         outputFolder = resolvePath(outputFolder);
 
-        // Define lookup root folders
-        setRoots(cli.root);
+        let realOutputFolder;
 
-        const minifyHtml = getBooleanOptionValue(cli, "minifyHtml", true);
-        const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
-        const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
-        const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
+        for (let i = 0; i < inputs.length; ++i)
+        {
+            const htmlPath = inputs[i];
 
-        // Copy detected files in HTML source to target folder
-        return await generateBuild(outputFolder, inputs, {minifyHtml, minifyCss, minifyJs, sourcemaps});
+            console.log(`Building for ${htmlPath}`);
+
+            // Define lookup root folders
+            setRoots(htmlPath, cli.root);
+
+            const minifyHtml = getBooleanOptionValue(cli, "minifyHtml", true);
+            const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
+            const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
+            const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
+
+            // Copy detected files in HTML source to target folder
+            realOutputFolder = await generateBuild(outputFolder, htmlPath, {
+                minifyHtml,
+                minifyCss,
+                minifyJs,
+                sourcemaps
+            });
+        }
+
+        // Start server
+        const dirs = [];
+        dirs.push(realOutputFolder);
+        dirs.push(cli.public);
+
+        await startServer({dirs, dynDirs: ["dynamic"]});
     }
     catch (e)
     {

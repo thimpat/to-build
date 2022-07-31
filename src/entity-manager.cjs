@@ -37,13 +37,18 @@ const addEntity = (category, entity) =>
         }
 
         const validPathname = getPathName(entity.uri);
+        if (validPathname === "/")
+        {
+            return false;
+        }
+
         if (validPathname)
         {
             entity.pathname = validPathname;
         }
 
-        const {rootFolder, sourcePath} = lookupSourcePath(entity.pathname || entity.uri);
-        if (!sourcePath)
+        const resLookups = lookupSourcePath(entity.pathname || entity.uri);
+        if (!resLookups)
         {
             if (entity.uri.indexOf("#") > -1)
             {
@@ -53,6 +58,8 @@ const addEntity = (category, entity) =>
             console.error(`Could not find local matching path for [${entity.uri}]. Skipping`);
             return false;
         }
+
+        const {rootFolder, sourcePath} = resLookups;
 
         entity.category = category;
         entity.sourcePath = sourcePath;
