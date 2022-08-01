@@ -131,7 +131,7 @@ const addEntity = (category, entity, referenceDir = "") =>
         const counter = entities[category].length - 1;
 
         const tagID = `${category}(${counter})`;
-        let replacement = counter <= 0 ? `${MASKS.DELIMITER}${tagID}${MASKS.DELIMITER}` : `${tagID}${MASKS.DELIMITER}`;
+        const replacement = `${MASKS.DELIMITER}${tagID}${MASKS.DELIMITER}`;
 
         entity.tagID = tagID;
         entity.replacement = replacement;
@@ -173,9 +173,23 @@ const addProdCode = ({entity}) =>
     return false;
 };
 
+const getCodeTagID = (tagID) =>
+{
+    return prod[tagID];
+};
+
+const getProdCode = () =>
+{
+    return prod;
+};
+
 module.exports.CATEGORY = CATEGORY;
 
 module.exports.addEntity = addEntity;
+
 module.exports.getEntityFromUri = getEntityFromUri;
 module.exports.getEntities = getEntities;
+
 module.exports.addProdCode = addProdCode;
+module.exports.getCodeTagID = getCodeTagID;
+module.exports.getProdCode = getProdCode;
