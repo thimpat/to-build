@@ -56,6 +56,11 @@ const getBooleanOptionValue = (cli, optionName, defaultValue = false) =>
         }
 
         let prop = cli[optionName] || "";
+        if (prop === true || prop === "true")
+        {
+            return true;
+        }
+
         prop = prop.trim().toLowerCase();
 
         if (!prop)
@@ -587,8 +592,8 @@ const copyGeneric = async ({
             // ------------
             const content = fs.readFileSync(entity.sourcePath, "utf-8");
             extractEntities(content, {
-                search  : `"src"\\s*:\\s*"([^"]+)"`,
-                category: CATEGORY.EXTRAS,
+                search      : `"src"\\s*:\\s*"([^"]+)"`,
+                category    : CATEGORY.EXTRAS,
                 referenceDir: entity.sourceDir
             });
             htmlContent = await applyChangesFromEntity(htmlContent, entity);
@@ -930,16 +935,28 @@ const stopServer = async ({namespace = "to-build", name = "staging"} = {}) =>
  * @param dynDirs
  * @returns {Promise<*>}
  */
-const startServer = async ({dirs = [], namespace = "to-build", name = "staging", port = 10002, dynDirs = []} = {}) =>
+const startServer = async ({
+                               dirs = [],
+                               namespace = "to-build",
+                               name = "staging",
+                               port = 10002,
+                               dynDirs = [],
+                               noserver = false
+                           } = {}) =>
 {
     try
     {
+        if (noserver)
+        {
+            return;
+        }
+
         if (!await stopServer({namespace, name}))
         {
             console.error(`Could not stop running server. Re-using the same one`);
         }
 
-        return await startGenServer({namespace, name, port, dirs, dynDirs});
+        return await startGenServer({namespace, name, port, dirs, dynDirs, args: ["--open"]});
     }
     catch (e)
     {
@@ -953,14 +970,14 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
  * Start development server
  * @returns {Promise<boolean>}
  */
-const startDevelopmentServer = async ({port = 10000} = {}) =>
+const startDevelopmentServer = async ({port = 10000, noserver = false} = {}) =>
 {
     try
     {
         // Start server for development
         const devDirs = getRoots();
         devDirs.push(...getStaticDirs());
-        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port}))
+        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port, noserver}))
         {
             console.error(`Failed to start the development server`);
         }
@@ -978,9 +995,10 @@ const startDevelopmentServer = async ({port = 10000} = {}) =>
  * Start staging server
  * @param realOutputFolder
  * @param port
+ * @param noserver
  * @returns {Promise<boolean>}
  */
-const startStagingServer = async (realOutputFolder, {port = 10002} = {}) =>
+const startStagingServer = async (realOutputFolder, {port = 10002, noserver = false} = {}) =>
 {
     try
     {
@@ -989,7 +1007,7 @@ const startStagingServer = async (realOutputFolder, {port = 10002} = {}) =>
         stagingDirs.push(realOutputFolder);
         stagingDirs.push(...getStaticDirs());
 
-        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port}))
+        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port, noserver}))
         {
             console.error(`Failed to start the staging server`);
         }
@@ -1007,9 +1025,10 @@ const startStagingServer = async (realOutputFolder, {port = 10002} = {}) =>
  * Start production server
  * @param realOutputFolder
  * @param port
+ * @param noserver
  * @returns {Promise<boolean>}
  */
-const startProductionServer = async (realOutputFolder, {port = 10004} = {}) =>
+const startProductionServer = async (realOutputFolder, {port = 10004, noserver = false} = {}) =>
 {
     try
     {
@@ -1018,7 +1037,7 @@ const startProductionServer = async (realOutputFolder, {port = 10004} = {}) =>
         productionDirs.push(realOutputFolder);
         productionDirs.push(...getStaticDirs());
 
-        if (!await startServer({name: "production", dirs: productionDirs, dynDirs: ["dynamic"], port}))
+        if (!await startServer({name: "production", dirs: productionDirs, dynDirs: ["dynamic"], port, noserver}))
         {
             console.error(`Failed to start the production server`);
         }
@@ -1152,7 +1171,8 @@ const generateAllHTMLs = async (inputs, {
     minifyCss,
     minifyJs,
     sourcemaps,
-    isProduction = false
+    isProduction = false,
+    noserver = false
 }) =>
 {
     try
@@ -1203,11 +1223,11 @@ const generateAllHTMLs = async (inputs, {
         // ---------------------------------------------
         if (buildType === "staging")
         {
-            await startStagingServer(result.outputFolder);
+            await startStagingServer(result.outputFolder, {noserver});
         }
         else if (buildType === "production")
         {
-            await startProductionServer(outputFolder);
+            await startProductionServer(outputFolder, {noserver});
         }
 
         return result;
@@ -1255,6 +1275,7 @@ const generateAllHTMLs = async (inputs, {
         const development = getBooleanOptionValue(cli, "development", true);
         const staging = getBooleanOptionValue(cli, "staging", true);
         const production = getBooleanOptionValue(cli, "production", true);
+        const noserver = getBooleanOptionValue(cli, "noserver", false);
 
         const root = cli.root;
 
@@ -1263,7 +1284,7 @@ const generateAllHTMLs = async (inputs, {
         if (development)
         {
             setRoots(null, root);
-            await startDevelopmentServer();
+            await startDevelopmentServer({noserver});
         }
 
         if (staging)
@@ -1275,7 +1296,8 @@ const generateAllHTMLs = async (inputs, {
                 minifyCss,
                 minifyJs,
                 sourcemaps,
-                isProduction: false
+                isProduction: false,
+                noserver
             });
         }
 
@@ -1288,7 +1310,8 @@ const generateAllHTMLs = async (inputs, {
                 minifyCss,
                 minifyJs,
                 sourcemaps,
-                isProduction: true
+                isProduction: true,
+                noserver
             });
         }
 
