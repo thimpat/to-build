@@ -121,7 +121,8 @@ const addEntity = (category, entity, referenceDir = "") =>
 
         entity.category = category;
         entity.sourcePath = sourcePath;
-        entity.sourceDir = rootFolder;
+        entity.sourceDir = path.parse(sourcePath).dir;
+        entity.rootFolder = rootFolder;
 
         entities[category] = entities[category] || [];
         entities[category].push(entity);

@@ -574,31 +574,29 @@ const minifyEsm = async ({
 const copyGeneric = async ({
                                htmlContent,
                                destFolder,
-                               entity,
-                               production = false
+                               entity
                            } = {}) =>
 {
     try
     {
-        const {sourcePath} = entity;
-        if (sourcePath.indexOf("manifest.json") > -1)
+        // Add target information to the entity object
+        await reviewTargetEntity(entity, destFolder);
+
+        if (entity.sourcePath.indexOf("manifest.json") > -1)
         {
             // ------------
-            const content = fs.readFileSync(sourcePath, "utf-8");
-            const referenceDir = path.parse(sourcePath).dir;
+            const content = fs.readFileSync(entity.sourcePath, "utf-8");
             extractEntities(content, {
                 search  : `"src"\\s*:\\s*"([^"]+)"`,
                 category: CATEGORY.EXTRAS,
-                referenceDir
+                referenceDir: entity.sourceDir
             });
+            htmlContent = await applyChangesFromEntity(htmlContent, entity);
             // ------------
         }
 
         if (!["manifest.json"].includes(entity.fullname))
         {
-            // Add target information to the entity object
-            await reviewTargetEntity(entity, destFolder, {production});
-
             htmlContent = await applyChangesFromEntity(htmlContent, entity);
         }
 
@@ -805,6 +803,7 @@ const copyAssetsFromHTML = async (input, outputFolder, {
             category     : CATEGORY.MEDIAS
         });
 
+        // INLINE CSS
         const referenceDir = path.parse(input).dir;
         extractEntities(htmlContent, {
             search  : "url\\([\"']?([^\"']+)[\"']?\\)",
@@ -1046,6 +1045,13 @@ const generateTag = (entitiesSpecificsList, outputFolder) =>
             const specificEntity = entitiesSpecificsList[i];
 
             bigCode += `/** ${specificEntity.pathname} */` + os.EOL;
+
+            if (!specificEntity.code)
+            {
+                // Empty css
+                continue;
+            }
+
             bigCode += specificEntity.code + os.EOL + os.EOL + os.EOL;
         }
 
@@ -1137,21 +1143,6 @@ const buildProductionTargets = ({outputFolder, htmlContent}) =>
 
     return null;
 };
-
-async function generateFiles(htmlPath, {root, outputFolder, minifyHtml, minifyCss, minifyJs, sourcemaps})
-{
-    try
-    {
-
-        return res;
-    }
-    catch (e)
-    {
-        console.error({lid: 1000}, e.message);
-    }
-
-    return null;
-}
 
 const generateAllHTMLs = async (inputs, {
     root,
@@ -1261,7 +1252,7 @@ const generateAllHTMLs = async (inputs, {
         const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
         const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
         const staging = getBooleanOptionValue(cli, "staging", true);
-        const production = !staging;
+        const production = getBooleanOptionValue(cli, "production", true);
 
         const root = cli.root;
 
