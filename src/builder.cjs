@@ -951,17 +951,16 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
 
 /**
  * Start development server
- * @param realOutputFolder
  * @returns {Promise<boolean>}
  */
-const startDevelopmentServer = async (realOutputFolder) =>
+const startDevelopmentServer = async ({port = 10000} = {}) =>
 {
     try
     {
         // Start server for development
         const devDirs = getRoots();
         devDirs.push(...getStaticDirs());
-        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port: 10000}))
+        if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port}))
         {
             console.error(`Failed to start the development server`);
         }
@@ -978,9 +977,10 @@ const startDevelopmentServer = async (realOutputFolder) =>
 /**
  * Start staging server
  * @param realOutputFolder
+ * @param port
  * @returns {Promise<boolean>}
  */
-const startStagingServer = async (realOutputFolder) =>
+const startStagingServer = async (realOutputFolder, {port = 10002} = {}) =>
 {
     try
     {
@@ -989,7 +989,7 @@ const startStagingServer = async (realOutputFolder) =>
         stagingDirs.push(realOutputFolder);
         stagingDirs.push(...getStaticDirs());
 
-        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port: 10002}))
+        if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port}))
         {
             console.error(`Failed to start the staging server`);
         }
@@ -1006,9 +1006,10 @@ const startStagingServer = async (realOutputFolder) =>
 /**
  * Start production server
  * @param realOutputFolder
+ * @param port
  * @returns {Promise<boolean>}
  */
-const startProductionServer = async (realOutputFolder) =>
+const startProductionServer = async (realOutputFolder, {port = 10004} = {}) =>
 {
     try
     {
@@ -1017,7 +1018,7 @@ const startProductionServer = async (realOutputFolder) =>
         productionDirs.push(realOutputFolder);
         productionDirs.push(...getStaticDirs());
 
-        if (!await startServer({name: "production", dirs: productionDirs, dynDirs: ["dynamic"], port: 10004}))
+        if (!await startServer({name: "production", dirs: productionDirs, dynDirs: ["dynamic"], port}))
         {
             console.error(`Failed to start the production server`);
         }
@@ -1251,12 +1252,19 @@ const generateAllHTMLs = async (inputs, {
         const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
         const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
         const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
+        const development = getBooleanOptionValue(cli, "development", true);
         const staging = getBooleanOptionValue(cli, "staging", true);
         const production = getBooleanOptionValue(cli, "production", true);
 
         const root = cli.root;
 
         setStaticDirs(cli.static);
+
+        if (development)
+        {
+            setRoots(null, root);
+            await startDevelopmentServer();
+        }
 
         if (staging)
         {
@@ -1270,7 +1278,8 @@ const generateAllHTMLs = async (inputs, {
                 isProduction: false
             });
         }
-        else
+
+        if (production)
         {
             await generateAllHTMLs(inputs, {
                 root,
