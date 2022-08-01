@@ -3,10 +3,13 @@ const fs = require("fs");
 
 const {joinPath} = require("@thimpat/libutils");
 
-const {lookupSourcePath, getPathName} = require("./source-finder.cjs");
+const {getPathName, lookupRootPath, lookupStaticPath} = require("./source-finder.cjs");
+const {MASKS} = require("./constants.cjs");
+const path = require("path");
 
 const lookup = {};
 const entities = {};
+const prod = {};
 
 /**
  * @typedef CATEGORY_TYPE
@@ -38,23 +41,39 @@ const addEntity = (category, entity, referenceDir = "") =>
     {
         if (!entity.uri)
         {
-            return false;
+            return null;
         }
 
         if (isUrl(entity.uri))
         {
-            return false;
+            return null;
         }
 
         const validPathname = getPathName(entity.uri);
         if (validPathname === "/")
         {
-            return false;
+            return null;
         }
 
         if (validPathname)
         {
             entity.pathname = validPathname;
+            const info = path.parse(entity.pathname);
+
+            // Name without extension
+            entity.name = info.name;
+
+            // Name with extension
+            entity.base = info.base;
+
+            // // Name without special characters that contains uri symbols like # ?
+            // entity.filename = getPathName(entity.base, {withTrailingSlash: false});
+
+            entity.ext = info.ext;
+            entity.dir = info.dir;
+
+            const subParts = entity.pathname.split("/");
+            entity.fullname = subParts[subParts.length - 1];
         }
 
         let resLookups;
@@ -63,8 +82,14 @@ const addEntity = (category, entity, referenceDir = "") =>
             const sourcePath = joinPath(referenceDir, entity.pathname);
             if (!fs.existsSync(sourcePath))
             {
+                if (lookupStaticPath(entity.pathname))
+                {
+                    console.log(`[${entity.pathname}] is in the public directory. No action taken`);
+                    return null;
+                }
+
                 console.error(`Could not find [${entity.pathname}]`);
-                return false;
+                return null;
             }
             resLookups = {
                 rootFolder: referenceDir,
@@ -73,16 +98,22 @@ const addEntity = (category, entity, referenceDir = "") =>
         }
         else
         {
-            resLookups = lookupSourcePath(entity.pathname || entity.uri);
+            resLookups = lookupRootPath(entity.pathname || entity.uri);
             if (!resLookups)
             {
                 if (entity.uri.indexOf("#") > -1)
                 {
-                    return false;
+                    return null;
+                }
+
+                if (lookupStaticPath(entity.uri))
+                {
+                    console.log(`[${entity.uri}] is in the public directory. No action taken`);
+                    return null;
                 }
 
                 console.error(`Could not find local matching path for [${entity.uri}]. Skipping`);
-                return false;
+                return null;
             }
         }
 
@@ -97,14 +128,23 @@ const addEntity = (category, entity, referenceDir = "") =>
 
         lookup[entity.uri] = entity;
 
-        return true;
+        const counter = entities[category].length - 1;
+
+        const tagID = `${category}(${counter})`;
+        let replacement = counter <= 0 ? `${MASKS.DELIMITER}${tagID}${MASKS.DELIMITER}` : `${tagID}${MASKS.DELIMITER}`;
+
+        entity.tagID = tagID;
+        entity.replacement = replacement;
+        entity.originalUri = entity.uri;
+
+        return {replacement};
     }
     catch (e)
     {
         console.error({lid: 3001}, e.message);
     }
 
-    return false;
+    return null;
 };
 
 const getEntityFromUri = (uri) =>
@@ -117,8 +157,25 @@ const getEntities = (category) =>
     return entities[category] || [];
 };
 
+
+const addProdCode = ({entity}) =>
+{
+    try
+    {
+        prod[entity.tagID] = entity;
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
 module.exports.CATEGORY = CATEGORY;
 
 module.exports.addEntity = addEntity;
 module.exports.getEntityFromUri = getEntityFromUri;
 module.exports.getEntities = getEntities;
+module.exports.addProdCode = addProdCode;

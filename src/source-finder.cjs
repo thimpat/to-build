@@ -10,15 +10,20 @@ let staticFolders = [];
  * Define directories where the assets will be looked for
  * The directory where the html being parsed is the default
  * node_modules/ is also part of it
- * @param htmlPath
+ * @param htmlPathFolder
  * @param roots
  * @returns {boolean}
  */
-const setRoots = (htmlPath, roots ) =>
+const setRoots = (htmlPathFolder, roots ) =>
 {
     try
     {
         rootFolders = [];
+        if (htmlPathFolder)
+        {
+            rootFolders.push(htmlPathFolder);
+        }
+
         roots = roots || [];
         if (!Array.isArray(roots))
         {
@@ -30,14 +35,6 @@ const setRoots = (htmlPath, roots ) =>
             {
                 roots = [roots];
             }
-        }
-
-        // Add the index.html file directory to the lookup root list
-        let htmlPathFolder = path.parse(htmlPath).dir;
-        if (htmlPathFolder)
-        {
-            htmlPathFolder = resolvePath(htmlPathFolder);
-            rootFolders.unshift(htmlPathFolder);
         }
 
         for (let i = 0; i < roots.length; ++i)
@@ -52,10 +49,9 @@ const setRoots = (htmlPath, roots ) =>
             rootFolders.push(root);
         }
 
-        // Add the current working directory to the lookup path list
+        // Add the current working directory to the lookup path list?
         let cwd = process.cwd();
         cwd = resolvePath(cwd);
-
         // rootFolders.push(cwd);
 
         // Add the node_modules directory to the lookup path list
@@ -132,7 +128,7 @@ const getStaticDirs = () =>
     return staticFolders;
 };
 
-const getPathName = (uri) =>
+const getPathName = (uri, {withTrailingSlash = true} = {}) =>
 {
     try
     {
@@ -142,6 +138,18 @@ const getPathName = (uri) =>
             return null;
         }
 
+        if (!result.pathname)
+        {
+            return "";
+        }
+
+        if (!withTrailingSlash)
+        {
+            if (result.pathname.charAt(0) === "/")
+            {
+                return result.pathname.substring(1);
+            }
+        }
         return result.pathname;
     }
     catch (e)
@@ -153,11 +161,13 @@ const getPathName = (uri) =>
 };
 
 /**
- * Look for uri in various folders (root folder defined by user like node_modules)
+ * Look for uri in various folders
+ * - node_modules
+ * - folders defined with --root folder option
  * @param uri
  * @returns {null|*}
  */
-const lookupSourcePath = (uri) =>
+const lookupRootPath = (uri) =>
 {
     if (!uri)
     {
@@ -198,6 +208,35 @@ const lookupSourcePath = (uri) =>
     return null;
 };
 
+const lookupStaticPath = (uri) =>
+{
+    if (!uri)
+    {
+        return null;
+    }
+
+    try
+    {
+        const lookupFolders = getStaticDirs();
+
+        for (let i = 0; i < lookupFolders.length; ++i)
+        {
+            const rootFolder = lookupFolders[i];
+            const sourcePath = joinPath(rootFolder, uri);
+            if (fs.existsSync(sourcePath))
+            {
+                return {rootFolder, sourcePath};
+            }
+        }
+    }
+    catch (e)
+    {
+        console.error({lid: 1001}, e.message);
+    }
+
+    return null;
+};
+
 
 module.exports.setRoots = setRoots;
 module.exports.getRoots = getRoots;
@@ -206,4 +245,6 @@ module.exports.setStaticDirs = setStaticDirs;
 module.exports.getStaticDirs = getStaticDirs;
 
 module.exports.getPathName = getPathName;
-module.exports.lookupSourcePath = lookupSourcePath;
+
+module.exports.lookupRootPath = lookupRootPath;
+module.exports.lookupStaticPath = lookupStaticPath;

@@ -28,16 +28,16 @@ const stripHtmlComments = require("strip-html-comments");
 const minifierHtml = require("html-minifier").minify;
 
 const {resolvePath, joinPath} = require("@thimpat/libutils");
-const {setRoots, getRoots, setStaticDirs, getStaticDirs} = require("./source-finder.cjs");
+const {setRoots, getRoots, setStaticDirs, getStaticDirs, getPathName} = require("./source-finder.cjs");
 
 const CleanCSS = require("clean-css");
 const UglifyJS = require("uglify-js");
 
 const {TARGET, transpileFiles} = require("to-esm");
 
-const {CATEGORY, addEntity, getEntities} = require("./entity-manager.cjs");
-const {startGenServer, stopGenServer, infoGenServer, isGenserverUp} = require("genserve");
-
+const {CATEGORY, addEntity, addProdCode, getEntities} = require("./entity-manager.cjs");
+const {startGenServer, stopGenServer, isGenserverUp} = require("genserve");
+const {getHashFromFile, getHashFromText} = require("./utils.cjs");
 
 const parseCli = (argv) =>
 {
@@ -81,7 +81,7 @@ const getBooleanOptionValue = (cli, optionName, defaultValue = false) =>
  * @param referenceDir
  * @param {string} tagName Tag to extract the uri source from (can be a regex string)
  * @param {string} sourceRefName Property that contains the uri to register
- * @param {string} extraProperty When the tag is detected, we can check whether a property is there to narrow down
+ * @param {string|null} extraProperty When the tag is detected, we can check whether a property is there to narrow down
  * the selection. (can be a regex string)
  * @param {CATEGORY_TYPE} category
  * @returns {*}
@@ -113,7 +113,6 @@ const extractEntities = (content, {
             regexpProp = new RegExp(extraProperty, "g");
         }
 
-        let counter = 0;
         for (const match of matches)
         {
             const tag = match[0].toLowerCase();
@@ -127,15 +126,15 @@ const extractEntities = (content, {
             }
 
             const uri = match[1];
-            const replacement = `${category}(${counter}, ${uri})`;
 
-            const added = addEntity(category, {tag, uri, replacement}, referenceDir);
+
+            const added = addEntity(category, {tag, uri}, referenceDir);
             if (!added)
             {
                 continue;
             }
 
-            content = content.replace(tag, replacement);
+            content = content.replace(tag, added.replacement);
         }
 
         return content;
@@ -213,25 +212,152 @@ const makePathRelative = (newUri) =>
     return newUri;
 };
 
-const updateHtml = (htmlContent, {entity, minifiedUri = null, targetBase}) =>
+const decorticatePath = (targetPath) =>
 {
     try
     {
-        let {uri, tag, replacement} = entity;
-        const originalUri = uri;
-        uri = makePathRelative(uri);
+        const infoPath = path.parse(targetPath);
+        infoPath.filename = getPathName(infoPath.base, {withTrailingSlash: false});
+        infoPath.originalPath = targetPath;
 
-        if (minifiedUri)
+        infoPath.path = targetPath;
+        if (infoPath.filename !== infoPath.base)
         {
-            uri = replaceLast(uri, targetBase, minifiedUri);
+            infoPath.path = joinPath(infoPath.dir, infoPath.filename);
         }
+        return infoPath;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
 
-        let newTag = replaceLast(tag, originalUri, uri);
-        htmlContent = htmlContent.replace(replacement, newTag);
+    return false;
+};
+
+/**
+ * Re-insert the modified code
+ * @param htmlContent
+ * @param entity
+ * @param minifiedUri
+ * @returns {*}
+ */
+const updateHtml = (htmlContent, {entity}) =>
+{
+    try
+    {
+        entity.uri = makePathRelative(entity.uri);
+
+        let newTag = replaceLast(entity.tag, entity.originalUri, entity.uri);
+        htmlContent = htmlContent.replace(entity.replacement, newTag);
     }
     catch (e)
     {
         console.error({lid: 1021}, e.message);
+    }
+
+    return htmlContent;
+};
+
+const reviewTargetEntity = async (entity, destFolder, {production = false, minify = false, sourcemaps = false} = {}) =>
+{
+    try
+    {
+        let {uri} = entity;
+
+        if (production)
+        {
+            let newName = await getHashFromFile(entity.sourcePath);
+
+            const info = path.parse(entity.sourcePath);
+
+            entity.targetName = newName;
+            entity.uri = entity.fullname.replace(info.name, newName);
+            entity.targetPath = joinPath(destFolder, entity.uri);
+        }
+        else
+        {
+            entity.targetPath = joinPath(destFolder, uri);
+        }
+
+        const info = decorticatePath(entity.targetPath);
+        entity.targetDir = info.dir;
+        entity.originalPath = info.originalPath;
+
+        if (minify)
+        {
+            entity.targetName = entity.name + ".min";
+            entity.targetPathUncompressed = entity.targetPath;
+            entity.targetPath = replaceLast(entity.targetPath, entity.name, entity.targetName);
+            entity.uri = replaceLast(entity.uri, entity.name, entity.targetName);
+        }
+        else
+        {
+            entity.targetName = entity.targetName || info.name;
+        }
+
+        if (sourcemaps)
+        {
+            entity.sourcemapName = entity.name + entity.ext + ".map";
+            entity.sourcemapPath = joinPath(entity.targetDir, entity.sourcemapName);
+        }
+
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
+/**
+ * Update html file content based on entity object content
+ * @param htmlContent
+ * @param entity
+ * @param alreadyGenerated
+ * @returns {Promise<null|*>}
+ */
+const applyChangesFromEntity = async (htmlContent, entity, {alreadyGenerated = false} = {}) =>
+{
+    try
+    {
+        if (!fs.existsSync(entity.targetDir))
+        {
+            fs.mkdirSync(entity.targetDir, {recursive: true});
+        }
+
+        if (!alreadyGenerated)
+        {
+            if (entity.code)
+            {
+                if (entity.sourcemapContent)
+                {
+                    // Write source map
+                    fs.writeFileSync(entity.sourcemapPath, entity.sourcemapContent, "utf-8");
+
+                    // Write original
+                    fs.writeFileSync(entity.targetPathUncompressed, entity.originalContent, "utf-8");
+                }
+
+                // Write minified
+                fs.writeFileSync(entity.targetPath, entity.code, "utf-8");
+            }
+            else
+            {
+                // Copy the corresponding file to its calculated new location
+                fs.copyFileSync(entity.sourcePath, entity.targetPath);
+            }
+        }
+
+        // Update the path in the html file
+        htmlContent = updateHtml(htmlContent, {entity});
+        reportResult({entity});
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
     }
 
     return htmlContent;
@@ -283,43 +409,39 @@ const reportResult = ({sourcemaps = false, minified = false, bundled = false, en
  * @param htmlContent
  * @param sourcemaps
  * @param targetDir
- * @param targetName
- * @param targetBase
- * @param uriProp
  * @returns {null|{content: string, htmlContent: *}}
  */
-const minifyCss = (solvedSourceAbsolutePath, {
-    htmlContent,
-    sourcemaps = false,
-    targetDir,
-    targetName,
-    targetBase,
-    entity
-} = {}) =>
+const minifyCss = async ({
+                             htmlContent,
+                             destFolder,
+                             sourcemaps = false,
+                             entity,
+                             production = false
+                         } = {}) =>
 {
     try
     {
+        // Add target information to the entity object
+        await reviewTargetEntity(entity, destFolder, {production, minify: true, sourcemaps});
+
         const cssMinifyingOptions = {};
         if (sourcemaps)
         {
             cssMinifyingOptions.sourceMap = true;
-            cssMinifyingOptions.rebaseTo = targetDir;
+            cssMinifyingOptions.rebaseTo = entity.targetDir;
         }
 
-        let content = "";
-
-        const originalContent = fs.readFileSync(solvedSourceAbsolutePath, "utf-8");
+        entity.originalContent = fs.readFileSync(entity.sourcePath, "utf-8");
 
         // ------------
-        const referenceDir = path.parse(solvedSourceAbsolutePath).dir;
-        extractEntities(originalContent, {
-            search       : "url\\([\"']?([^\"']+)[\"']?\\)",
-            category     : CATEGORY.GENERIC,
-            referenceDir
+        extractEntities(entity.originalContent, {
+            search      : "url\\([\"']?([^\"']+)[\"']?\\)",
+            category    : CATEGORY.GENERIC,
+            referenceDir: entity.sourceDir
         });
         // ------------
 
-        const css = new CleanCSS(cssMinifyingOptions).minify(originalContent);
+        const css = new CleanCSS(cssMinifyingOptions).minify(entity.originalContent);
 
         // css.warnings && css.warnings.length && console.log(css.warnings.join(os.EOL));
         css.errors && css.errors.length && console.log(css.errors.join(os.EOL));
@@ -327,80 +449,63 @@ const minifyCss = (solvedSourceAbsolutePath, {
         // CSS minifying was successful
         if (css && css.styles)
         {
-            content = css.styles;
+            entity.code = css.styles;
         }
 
-
-        let minifiedUri = targetName + ".min.css";
-        const targetPath = joinPath(targetDir, targetName + ".css");
-        const targetPathMinified = joinPath(targetDir, minifiedUri);
-        if (css.sourceMap)
+        if (production)
         {
-            const sourcemapPath = joinPath(targetDir, targetName + ".css.map");
-            const sourcemapContent = css.sourceMap.toString();
-
-            // Write source map
-            fs.writeFileSync(sourcemapPath, sourcemapContent, "utf-8");
-
-            // Write original
-            fs.writeFileSync(targetPath, originalContent, "utf-8");
-
-            content = content + os.EOL + `/*# sourceMappingURL=${targetName}.css.map */`;
+            addProdCode({entity});
+        }
+        else
+        {
+            if (css.sourceMap)
+            {
+                entity.sourcemapContent = css.sourceMap.toString();
+                entity.code = entity.code + os.EOL + `/*# sourceMappingURL=${entity.sourcemapName} */`;
+            }
         }
 
-        // Write minified
-        fs.writeFileSync(targetPathMinified, content, "utf-8");
+        htmlContent = await applyChangesFromEntity(htmlContent, entity);
 
-        htmlContent = updateHtml(htmlContent, {entity, minifiedUri, targetBase});
-
-        reportResult({sourcemaps: !!css.sourceMap, minified: true, entity});
-
-        return {content, htmlContent};
     }
     catch (e)
     {
         console.error({lid: 1025}, e.message);
     }
 
-    return null;
+    return {htmlContent};
 };
 
 /**
  * Minify .js using uglify-js to do the minifying
  * @param solvedSourceAbsolutePath
  * @param sourcemaps
- * @param targetDir
- * @param targetName
- * @param uri
  * @returns {{content: string}|null}
  */
-const minifyJs = (solvedSourceAbsolutePath, {
-    htmlContent,
-    sourcemaps = false,
-    targetDir,
-    targetName,
-    targetBase,
-    entity
-} = {}) =>
+const minifyJs = async ({
+                            htmlContent,
+                            destFolder,
+                            sourcemaps = false,
+                            entity,
+                            production = false
+                        } = {}) =>
 {
     try
     {
-        let minifiedUri = targetName + ".min.js";
-        const targetPath = joinPath(targetDir, targetName + ".js");
-        const targetPathMinified = joinPath(targetDir, minifiedUri);
-        const sourcemapPath = joinPath(targetDir, targetName + ".js.map");
+        // Add target information to the entity object
+        await reviewTargetEntity(entity, destFolder, {production, minify: true, sourcemaps});
 
         const jsMinifyingOptions = {};
         if (sourcemaps)
         {
             jsMinifyingOptions.sourceMap = {
-                filename: targetBase,
-                url     : targetName + ".js.map"
+                filename: entity.fullname,
+                url     : entity.sourcemapName
             };
         }
 
-        const originalContent = fs.readFileSync(solvedSourceAbsolutePath, "utf-8");
-        const result = UglifyJS.minify(originalContent, jsMinifyingOptions);
+        entity.originalContent = fs.readFileSync(entity.sourcePath, "utf-8");
+        const result = UglifyJS.minify(entity.originalContent, jsMinifyingOptions);
 
         if (result.error)
         {
@@ -408,56 +513,50 @@ const minifyJs = (solvedSourceAbsolutePath, {
             return null;
         }
 
-        const content = result.code;
+        entity.code = result.code;
 
-        // Write minified
-        fs.writeFileSync(targetPathMinified, content, "utf-8");
-
-        if (result.map)
+        if (production)
         {
-            const sourcemapContent = result.map;
-
-            // Write source map
-            fs.writeFileSync(sourcemapPath, sourcemapContent, "utf-8");
-
-            // Write original
-            fs.writeFileSync(targetPath, originalContent, "utf-8");
+            addProdCode({content: entity.code, entity});
+        }
+        else
+        {
+            if (result.map)
+            {
+                entity.sourcemapContent = result.map;
+            }
         }
 
-        htmlContent = updateHtml(htmlContent, {entity, minifiedUri, targetBase});
+        htmlContent = await applyChangesFromEntity(htmlContent, entity);
 
-        reportResult({sourcemaps: !!sourcemaps, minified: true, entity});
-
-        return {content, htmlContent};
     }
     catch (e)
     {
         console.error({lid: 1027}, e.message);
     }
 
-    return null;
+    return {htmlContent};
 };
 
-const minifyEsm = async (solvedSourceAbsolutePath, {
-    htmlContent,
-    sourcemaps = false,
-    targetDir,
-    targetName,
-    targetBase,
-    entity
-} = {}) =>
+const minifyEsm = async ({
+                             htmlContent,
+                             destFolder,
+                             sourcemaps = false,
+                             entity,
+                             production = false
+                         } = {}) =>
 {
     try
     {
-        let minifiedUri = targetName + ".min.js";
-        const targetPathMinified = joinPath(targetDir, minifiedUri);
+        // Add target information to the entity object
+        await reviewTargetEntity(entity, destFolder, {production, minify: true, sourcemaps});
 
         const esmOptions = {
-            input           : solvedSourceAbsolutePath,
+            input           : entity.sourcePath,
             noheader        : true,
             target          : TARGET.BROWSER,
             onlyBundle      : true,
-            "bundle-browser": targetPathMinified,
+            "bundle-browser": entity.targetPath,
             keepExternal    : true,
             resolveAbsolute : ["./node_modules"]
         };
@@ -474,45 +573,46 @@ const minifyEsm = async (solvedSourceAbsolutePath, {
             return null;
         }
 
-        htmlContent = updateHtml(htmlContent, {entity, minifiedUri, targetBase});
-
-        reportResult({sourcemaps: !!sourcemaps, minified: true, bundled: true, entity});
-
-        return {htmlContent};
+        htmlContent = await applyChangesFromEntity(htmlContent, entity, {alreadyGenerated: true});
     }
     catch (e)
     {
         console.error({lid: 1029}, e.message);
     }
 
-    return null;
+    return {htmlContent};
 };
 
-const copyGeneric = (solvedSourceAbsolutePath, {
-    htmlContent,
-    targetPath,
-    targetBase,
-    entity
-} = {}) =>
+const copyGeneric = async ({
+                               htmlContent,
+                               destFolder,
+                               entity,
+                               production = false
+                           } = {}) =>
 {
     try
     {
-        if (solvedSourceAbsolutePath.indexOf("manifest.json") > -1)
+        const {sourcePath} = entity;
+        if (sourcePath.indexOf("manifest.json") > -1)
         {
             // ------------
-            const content = fs.readFileSync(solvedSourceAbsolutePath, "utf-8");
-            const referenceDir = path.parse(solvedSourceAbsolutePath).dir;
+            const content = fs.readFileSync(sourcePath, "utf-8");
+            const referenceDir = path.parse(sourcePath).dir;
             extractEntities(content, {
-                search       : `"src"\\s*:\\s*"([^"]+)"`,
-                category     : CATEGORY.EXTRAS,
+                search  : `"src"\\s*:\\s*"([^"]+)"`,
+                category: CATEGORY.EXTRAS,
                 referenceDir
             });
             // ------------
         }
 
-        fs.copyFileSync(solvedSourceAbsolutePath, targetPath);
-        htmlContent = updateHtml(htmlContent, {entity, targetBase});
-        reportResult({entity});
+        if (!["manifest.json"].includes(entity.fullname))
+        {
+            // Add target information to the entity object
+            await reviewTargetEntity(entity, destFolder, {production});
+
+            htmlContent = await applyChangesFromEntity(htmlContent, entity);
+        }
 
         return {htmlContent};
     }
@@ -540,90 +640,68 @@ const copyGeneric = (solvedSourceAbsolutePath, {
  */
 const copyEntity = async (entity, destFolder, htmlContent, {
     minify = false,
-    sourcemaps = false
+    sourcemaps = false,
+    production = false
 } = {}) =>
 {
     try
     {
-        let {uri, category, sourcePath} = entity;
-
-        if (!sourcePath)
-        {
-            console.error(`Could not find local path for ${uri}`);
-            return null;
-        }
-
-        // Create target folder
-        let targetPath = joinPath(destFolder, uri);
-        const infoPath = path.parse(targetPath);
-        if (!fs.existsSync(infoPath.dir))
-        {
-            fs.mkdirSync(infoPath.dir, {recursive: true});
-        }
-
         let res;
 
         // Minify
         if (minify)
         {
-            if (category === CATEGORY.CSS)
+            if (entity.category === CATEGORY.CSS)
             {
-                res = minifyCss(sourcePath, {
+                res = await minifyCss({
                     htmlContent,
-                    sourcemaps,
-                    targetDir : infoPath.dir,
-                    targetName: infoPath.name,
-                    targetBase: infoPath.base,
-                    entity
-                });
-            }
-            else if (category === CATEGORY.SCRIPT)
-            {
-                res = minifyJs(sourcePath, {
-                    htmlContent,
-                    sourcemaps,
-                    targetDir : infoPath.dir,
-                    targetName: infoPath.name,
-                    targetBase: infoPath.base,
-                    entity
-                });
-            }
-            else if (category === CATEGORY.ESM)
-            {
-                res = await minifyEsm(sourcePath, {
-                    htmlContent,
-                    sourcemaps,
                     destFolder,
-                    targetDir : infoPath.dir,
-                    targetName: infoPath.name,
-                    targetBase: infoPath.base,
-                    entity
+                    sourcemaps,
+                    entity,
+                    production
+                });
+            }
+            else if (entity.category === CATEGORY.SCRIPT)
+            {
+                res = await minifyJs({
+                    htmlContent,
+                    destFolder,
+                    sourcemaps,
+                    entity,
+                    production
+                });
+            }
+            else if (entity.category === CATEGORY.ESM)
+            {
+                res = await minifyEsm({
+                    htmlContent,
+                    destFolder,
+                    sourcemaps,
+                    entity,
+                    production
                 });
             }
         }
         else
         {
             // CATEGORY.GENERIC, CATEGORY.MEDIAS, CATEGORY.EXTRAS
-            res = copyGeneric(sourcePath, {
+            res = await copyGeneric({
                 htmlContent,
-                targetPath,
-                targetDir : infoPath.dir,
-                targetName: infoPath.name,
-                targetBase: infoPath.base,
-                entity
+                destFolder,
+                entity,
+                production
             });
         }
 
         htmlContent = res.htmlContent;
 
-        return {uri, htmlContent};
     }
     catch (e)
     {
         console.error({lid: 1003}, e.message);
     }
 
-    return null;
+    return {htmlContent};
 };
 
 /**
@@ -634,7 +712,12 @@ const copyEntity = async (entity, destFolder, htmlContent, {
  * @param outputFolder
  * @returns {Promise<string>}
  */
-const copyEntities = async (category, outputFolder, {htmlContent = null, minify = false, sourcemaps = false} = {}) =>
+const copyEntities = async (category, outputFolder, {
+    htmlContent = null,
+    minify = false,
+    sourcemaps = false,
+    production = false
+} = {}) =>
 {
     try
     {
@@ -642,7 +725,7 @@ const copyEntities = async (category, outputFolder, {htmlContent = null, minify 
         for (let i = 0; i < entities.length; ++i)
         {
             const entity = entities[i];
-            const res = await copyEntity(entity, outputFolder, htmlContent, {minify, sourcemaps});
+            const res = await copyEntity(entity, outputFolder, htmlContent, {minify, sourcemaps, production});
 
             if (!res)
             {
@@ -669,13 +752,15 @@ const copyEntities = async (category, outputFolder, {htmlContent = null, minify 
  * @param minifyCss
  * @param minifyJs
  * @param sourcemaps
+ * @param production
  * @returns {Promise<string|null>}
  */
 const copyAssetsFromHTML = async (input, outputFolder, {
     minifyHtml = false,
     minifyCss = false,
     minifyJs = false,
-    sourcemaps = false
+    sourcemaps = false,
+    production = false
 } = {}) =>
 {
     try
@@ -734,21 +819,38 @@ const copyAssetsFromHTML = async (input, outputFolder, {
 
         const referenceDir = path.parse(input).dir;
         extractEntities(htmlContent, {
-            search       : "url\\([\"']?([^\"']+)[\"']?\\)",
-            category     : CATEGORY.GENERIC,
+            search  : "url\\([\"']?([^\"']+)[\"']?\\)",
+            category: CATEGORY.GENERIC,
             referenceDir
         });
 
 
+        htmlContent = await copyEntities(CATEGORY.CSS, outputFolder, {
+            htmlContent,
+            minify: minifyCss,
+            sourcemaps,
+            production
+        });
 
-        htmlContent = await copyEntities(CATEGORY.CSS, outputFolder, {htmlContent, minify: minifyCss, sourcemaps});
-        htmlContent = await copyEntities(CATEGORY.GENERIC, outputFolder, {htmlContent});
-        htmlContent = await copyEntities(CATEGORY.MEDIAS, outputFolder, {htmlContent});
-        htmlContent = await copyEntities(CATEGORY.ESM, outputFolder, {htmlContent, minify: minifyJs, sourcemaps});
-        htmlContent = await copyEntities(CATEGORY.SCRIPT, outputFolder, {htmlContent, minify: minifyJs, sourcemaps});
+        htmlContent = await copyEntities(CATEGORY.GENERIC, outputFolder, {htmlContent, production});
+        htmlContent = await copyEntities(CATEGORY.MEDIAS, outputFolder, {htmlContent, production});
+
+        htmlContent = await copyEntities(CATEGORY.ESM, outputFolder, {
+            htmlContent,
+            minify: minifyJs,
+            sourcemaps,
+            production
+        });
+
+        htmlContent = await copyEntities(CATEGORY.SCRIPT, outputFolder, {
+            htmlContent,
+            minify: minifyJs,
+            sourcemaps,
+            production
+        });
 
         // Extra files discovered during process i.e. manifest.json
-        await copyEntities(CATEGORY.EXTRAS, outputFolder, {htmlContent});
+        await copyEntities(CATEGORY.EXTRAS, outputFolder, {htmlContent, production});
 
         return htmlContent;
     }
@@ -769,13 +871,14 @@ const copyAssetsFromHTML = async (input, outputFolder, {
  * @param minifyCss
  * @param minifyJs
  * @param sourcemaps
- * @returns {Promise<boolean>}
+ * @returns {Promise<{outputFolder: (*), htmlContent: (string|null)}>}
  */
 const generateBuild = async (outputFolder, htmlPath, {
     minifyHtml = false,
     minifyCss = false,
     minifyJs = false,
-    sourcemaps = false
+    sourcemaps = false,
+    buildType = "staging"
 } = {}) =>
 {
     try
@@ -784,18 +887,26 @@ const generateBuild = async (outputFolder, htmlPath, {
 
         const parsed = path.parse(htmlPath);
 
+        if (buildType === "production")
+        {
+            minifyCss = true;
+            minifyJs = true;
+            sourcemaps = false;
+        }
+
         const realOutputFolder = path.isAbsolute(parsed.dir) ? resolvePath(outputFolder) : joinPath(outputFolder, parsed.dir);
         const htmlContent = await copyAssetsFromHTML(htmlPath, realOutputFolder, {
             minifyHtml,
             minifyCss,
             minifyJs,
-            sourcemaps
+            sourcemaps,
+            production: buildType === "production"
         });
 
         const targetHtmlPath = joinPath(realOutputFolder, parsed.base);
         fs.writeFileSync(targetHtmlPath, htmlContent, "utf-8");
 
-        return realOutputFolder;
+        return {outputFolder: realOutputFolder, htmlContent};
     }
     catch (e)
     {
@@ -823,6 +934,15 @@ const stopServer = async ({namespace = "to-build", name = "staging"} = {}) =>
     return false;
 };
 
+/**
+ * Start server
+ * @param dirs
+ * @param namespace
+ * @param name
+ * @param port
+ * @param dynDirs
+ * @returns {Promise<*>}
+ */
 const startServer = async ({dirs = [], namespace = "to-build", name = "staging", port = 10002, dynDirs = []} = {}) =>
 {
     try
@@ -842,7 +962,12 @@ const startServer = async ({dirs = [], namespace = "to-build", name = "staging",
     return false;
 };
 
-const startServers = async (realOutputFolder) =>
+/**
+ * Start development server
+ * @param realOutputFolder
+ * @returns {Promise<boolean>}
+ */
+const startDevelopmentServer = async (realOutputFolder) =>
 {
     try
     {
@@ -853,7 +978,25 @@ const startServers = async (realOutputFolder) =>
         {
             console.error(`Failed to start the development server`);
         }
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
 
+    return false;
+};
+
+/**
+ * Start staging server
+ * @param realOutputFolder
+ * @returns {Promise<boolean>}
+ */
+const startStagingServer = async (realOutputFolder) =>
+{
+    try
+    {
         // Start server for staging
         const stagingDirs = [];
         stagingDirs.push(realOutputFolder);
@@ -863,7 +1006,25 @@ const startServers = async (realOutputFolder) =>
         {
             console.error(`Failed to start the staging server`);
         }
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
 
+    return false;
+};
+
+/**
+ * Start production server
+ * @param realOutputFolder
+ * @returns {Promise<boolean>}
+ */
+const startProductionServer = async (realOutputFolder) =>
+{
+    try
+    {
         // Start server for production
         const productionDirs = [];
         productionDirs.push(realOutputFolder);
@@ -882,6 +1043,134 @@ const startServers = async (realOutputFolder) =>
     }
 
     return false;
+};
+
+async function generateStaging(htmlPath, {root, outputFolder, minifyHtml, minifyCss, minifyJs, sourcemaps})
+{
+    try
+    {
+        console.log(`Building staging for ${htmlPath}`);
+
+        // Define lookup root folders
+        setRoots(htmlPath, root);
+
+        // Copy detected files in HTML source to target folder
+        const res = await generateBuild(outputFolder, htmlPath, {
+            minifyHtml,
+            minifyCss,
+            minifyJs,
+            sourcemaps,
+            buildType: "staging"
+        });
+
+        return res;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return null;
+}
+
+const buildProductionTargets = (result) =>
+{
+    try
+    {
+        const entities = getEntities(CATEGORY.CSS);
+
+        return true;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return false;
+};
+
+async function generateFiles(htmlPath, {root, outputFolder, minifyHtml, minifyCss, minifyJs, sourcemaps})
+{
+    try
+    {
+
+        return res;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return null;
+}
+
+const generateAllHTMLs = async (inputs, {
+    root,
+    outputFolder,
+    minifyHtml,
+    minifyCss,
+    minifyJs,
+    sourcemaps,
+    isProduction = false
+}) =>
+{
+    try
+    {
+        const buildType = isProduction ? "production" : "staging";
+        outputFolder = path.join(outputFolder, buildType);
+        let result;
+
+        for (let i = 0; i < inputs.length; ++i)
+        {
+            const htmlPath = inputs[i];
+
+            console.log(`Building ${buildType} for ${htmlPath}`);
+
+            // Add the index.html file directory to the lookup root list
+            let htmlPathFolder = path.parse(htmlPath).dir;
+            if (htmlPathFolder)
+            {
+                htmlPathFolder = resolvePath(htmlPathFolder);
+            }
+
+            // Define lookup root folders
+            setRoots(htmlPathFolder, root);
+
+            // Copy detected files in HTML source to target folder
+            result = await generateBuild(outputFolder, htmlPath, {
+                minifyHtml,
+                minifyCss,
+                minifyJs,
+                sourcemaps,
+                buildType
+            });
+
+            if (isProduction)
+            {
+                buildProductionTargets(result);
+            }
+        }
+
+        // ---------------------------------------------
+        // Start servers
+        // ---------------------------------------------
+        if (buildType === "staging")
+        {
+            await startStagingServer(result.outputFolder);
+        }
+        else if (buildType === "production")
+        {
+            await startProductionServer(outputFolder);
+        }
+
+        return result;
+    }
+    catch (e)
+    {
+        console.error({lid: 1000}, e.message);
+    }
+
+    return null;
 };
 
 (async function init()
@@ -906,37 +1195,50 @@ const startServers = async (realOutputFolder) =>
         let outputFolder = cli.output || "./out";
         outputFolder = resolvePath(outputFolder);
 
-        let realOutputFolder;
-
-        for (let i = 0; i < inputs.length; ++i)
+        if (!fs.existsSync(outputFolder))
         {
-            const htmlPath = inputs[i];
-
-            console.log(`Building for ${htmlPath}`);
-
-            // Define lookup root folders
-            setRoots(htmlPath, cli.root);
-
-            const minifyHtml = getBooleanOptionValue(cli, "minifyHtml", true);
-            const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
-            const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
-            const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
-
-            // Copy detected files in HTML source to target folder
-            realOutputFolder = await generateBuild(outputFolder, htmlPath, {
-                minifyHtml,
-                minifyCss,
-                minifyJs,
-                sourcemaps
-            });
+            fs.mkdirSync(outputFolder, {recursive: true});
         }
+
+        // Grab minify options
+        const minifyHtml = getBooleanOptionValue(cli, "minifyHtml", true);
+        const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
+        const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
+        const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
+        const staging = getBooleanOptionValue(cli, "staging", true);
+        const production = getBooleanOptionValue(cli, "production", true);
+
+        const root = cli.root;
 
         setStaticDirs(cli.static);
 
-        // ---------------------------------------------
-        // Start servers
-        // ---------------------------------------------
-        await startServers(realOutputFolder);
+        let result;
+
+        if (staging)
+        {
+            result = await generateAllHTMLs(inputs, {
+                root,
+                outputFolder,
+                minifyHtml,
+                minifyCss,
+                minifyJs,
+                sourcemaps,
+                isProduction: false
+            });
+        }
+
+        if (production)
+        {
+            // result = await generateAllHTMLs(inputs, {
+            //     root,
+            //     outputFolder,
+            //     minifyHtml,
+            //     minifyCss,
+            //     minifyJs,
+            //     sourcemaps,
+            //     isProduction: true
+            // });
+        }
 
     }
     catch (e)
