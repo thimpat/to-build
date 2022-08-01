@@ -1,7 +1,4 @@
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
 
 ***
 
@@ -27,13 +24,24 @@ $> npm install to-build
 ## Usage
 
 
+##### Generate builds in the ./out directory with .css and .js minified
 
-##### Generate build with source maps in the ./out directory (Everything minified)
+###### Two builds generated in two different folders:
+
+`./out/staging` => Contains minified files + sourcemaps
+
+`./out/production` => Contains minified files with no sourcemaps (partially flattened folder)
+
+
 ```shell
 $> to-build src/index.html
 ```
 
 <br/>
+
+
+## Examples
+
 
 
 ##### Generate build in a folder called "target"
@@ -61,5 +69,25 @@ $> to-build src/index.html --minifyCss false
 ```shell
 $> to-build src/index.html --minifyHtml false
 ```
+
+<br/>
+
+##### Generate build with non-minified js
+```shell
+$> to-build src/index.html --minifyJs false
+```
+
+<br/>
+
+##### Generate build only for production
+
+```shell
+$> to-build src/index.html --development no --staging no
+```
+
+<br/>
+
+
+
 
 
