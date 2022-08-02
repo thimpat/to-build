@@ -71,6 +71,31 @@ $> to-build src/index.html
 <br/>
 
 
+## Servers
+
+By default, the development server runs on port 10000, staging on port 10002 and production on port 10004.
+
+**To have a quick report:**
+
+```shell
+$> npx genserve scan --namespace to-build
+```
+
+**To edit ports, locate the configuration file with:**
+
+```shell
+# To get the servers configuration path 
+$> npx genserve path servers --namespace to-build
+```
+
+**To stop servers**
+
+```shell
+$> npx genserve stop all --namespace to-build
+```
+
+
+
 ## Examples
 
 
