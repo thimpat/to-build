@@ -244,17 +244,19 @@ const updateHtml = (htmlContent, {entity}) =>
     return htmlContent;
 };
 
+/**
+ *
+ * @param entity
+ * @param destFolder
+ * @param {boolean} production Generates a hash id for the file being processed.
+ * @param {boolean} minify Rename target
+ * @param sourcemaps
+ * @returns {Promise<boolean>}
+ */
 const reviewTargetEntity = async (entity, destFolder, {production = false, minify = false, sourcemaps = false} = {}) =>
 {
     try
     {
-        if (production)
-        {
-            minify = false;
-        }
-
-        let {uri} = entity;
-
         if (production)
         {
             let newName = await getHashFromFile(entity.sourcePath);
@@ -262,12 +264,23 @@ const reviewTargetEntity = async (entity, destFolder, {production = false, minif
             const info = path.parse(entity.sourcePath);
 
             entity.targetName = newName;
+
             entity.uri = entity.fullname.replace(info.name, newName);
-            entity.targetPath = joinPath(destFolder, entity.uri);
+            entity.pathname = entity.uri;
+
+            entity.targetPath = joinPath(destFolder, entity.pathname);
+
+            // Minify here is to let the lines below that targetPath
+            // should not be renamed to contain the .min extension.
+            // The file is still minified. It just keeps the name which is an id without
+            // extras
+            minify = false;
         }
         else
         {
-            entity.targetPath = joinPath(destFolder, uri);
+            // NOTE: Do not use entity.uri. It may contain special character as normally found in a uri
+            // that cannot be translated into a path system.
+            entity.targetPath = joinPath(destFolder, entity.pathname);
         }
 
         const info = decorticatePath(entity.targetPath);
@@ -326,6 +339,7 @@ const applyChangesFromEntity = async (htmlContent, entity, {alreadyGenerated = f
 
         if (!alreadyGenerated)
         {
+            // The .code property contains the minified code
             if (entity.code)
             {
                 if (entity.sourcemapContent)
