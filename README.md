@@ -10,7 +10,7 @@ to-build is a quick build generator
 
 ## Description
 
-to-build parses an index.html in development and generate a new build from it.
+to-build parses an index.html in development and generates a new build from it.
 
 <br/>
 
@@ -20,13 +20,20 @@ to-build parses an index.html in development and generate a new build from it.
 $> npm install to-build
 ```
 
+<br/>
+
+## Note
+
+> to-build is at an experimental level
+
+<br/>
 
 ## Usage
 
 
 ##### Generate builds in the ./out directory with .css and .js minified
 
-###### Two builds generated in two different folders:
+###### Two builds were generated in two different folders:
 
 `./out/staging` => Contains minified files + sourcemaps
 
@@ -36,6 +43,27 @@ $> npm install to-build
 ```shell
 $> to-build src/index.html
 ```
+
+<br/>
+
+
+## Options
+
+| **Options**   | **Description**                                          | **Expect** |
+|---------------|----------------------------------------------------------|------------|
+| --development | _Only launch the server against your development folder_ | boolean    |
+| --staging     | _Do a build for staging_                                 | boolean    |
+| --production  | _Do a build for production_                              | boolean    |
+| --all         | _Do a build for staging and production at once_          | boolean    |
+| --noserver    | _Do not run servers after builds_                        | boolean    |  
+| --output      | _The folder to hold the build_                           | string     |  
+| --static      | _Folder for assets or public_                            | string     |  
+| --root        | _Extra folders to resolve paths_                         | string     |  
+| --minifyCss   | _Whether to minify css_                                  | boolean    |  
+| --minifyJs    | _Whether to minify js_                                   | boolean    |  
+| --minifyHtml  | _Whether to minify html_                                 | boolean    |  
+
+
 
 <br/>
 
@@ -82,7 +110,23 @@ $> to-build src/index.html --minifyJs false
 ##### Generate build only for production
 
 ```shell
-$> to-build src/index.html --development no --staging no
+$> to-build src/index.html --production
+```
+
+<br/>
+
+##### Generate build only for staging
+
+```shell
+$> to-build src/index.html --staging
+```
+
+<br/>
+
+##### Generate build only for development
+
+```shell
+$> to-build src/index.html --development
 ```
 
 <br/>
