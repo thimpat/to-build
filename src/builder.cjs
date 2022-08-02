@@ -40,6 +40,8 @@ const {startGenServer, stopGenServer, isGenserverUp} = require("genserve");
 const {getHashFromFile, getHashFromText} = require("./utils.cjs");
 const {MASKS} = require("./constants.cjs");
 
+const {anaLogger} = require("analogger");
+
 const parseCli = (argv) =>
 {
     return minimist(argv.slice(2));
@@ -1244,6 +1246,10 @@ const generateAllHTMLs = async (inputs, {
 {
     try
     {
+        anaLogger.setOptions({silent: false, hideError: false, hideHookMessage: true, lidLenMax: 4});
+        anaLogger.overrideConsole();
+        anaLogger.overrideError();
+
         const cli = parseCli(process.argv);
 
         for (let key in cli)
