@@ -1278,9 +1278,9 @@ const generateAllHTMLs = async (inputs, {
         const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
         const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
         const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
-        const development = getBooleanOptionValue(cli, "development", true);
-        const staging = getBooleanOptionValue(cli, "staging", true);
-        const production = getBooleanOptionValue(cli, "production", true);
+        const development = getBooleanOptionValue(cli, "development", false);
+        const staging = getBooleanOptionValue(cli, "staging", false);
+        const production = getBooleanOptionValue(cli, "production", false);
         const noserver = getBooleanOptionValue(cli, "noserver", false);
 
         const root = cli.root;
