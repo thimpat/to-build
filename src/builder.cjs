@@ -949,6 +949,7 @@ const stopServer = async ({namespace = "to-build", name = "staging"} = {}) =>
  * @param name
  * @param port
  * @param dynDirs
+ * @param noserver
  * @returns {Promise<*>}
  */
 const startServer = async ({
@@ -964,7 +965,7 @@ const startServer = async ({
     {
         if (noserver)
         {
-            return;
+            return true;
         }
 
         if (!await stopServer({namespace, name}))
