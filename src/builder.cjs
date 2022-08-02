@@ -27,7 +27,7 @@ const minimist = require("minimist");
 const stripHtmlComments = require("strip-html-comments");
 const minifierHtml = require("html-minifier").minify;
 
-const {resolvePath, joinPath} = require("@thimpat/libutils");
+const {resolvePath, joinPath, sleep} = require("@thimpat/libutils");
 const {setRoots, getRoots, setStaticDirs, getStaticDirs, getPathName} = require("./source-finder.cjs");
 
 const CleanCSS = require("clean-css");
@@ -955,14 +955,17 @@ const startServer = async ({
 
         if (!await stopServer({namespace, name}))
         {
-            console.error(`Could not stop running server. Re-using the same one`);
+            console.error({lid: 3040}, `Could not stop running server. Re-using the same one`);
         }
 
-        return await startGenServer({namespace, name, port, dirs, dynDirs, args: ["--open"]});
+        const res = await startGenServer({namespace, name, port, dirs, dynDirs, args: ["--open"]});
+        await sleep(1000);
+
+        return res;
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3042}, e.message);
     }
 
     return false;
