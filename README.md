@@ -62,7 +62,10 @@ $> to-build src/index.html
 | --minifyCss   | _Whether to minify css_                                  | boolean    |  
 | --minifyJs    | _Whether to minify js_                                   | boolean    |  
 | --minifyHtml  | _Whether to minify html_                                 | boolean    |  
+| --sourcemaps  | _Whether to generate sourcemaps_                         | boolean    |  
 
+
+* Sourcemaps are not generated in production
 
 
 <br/>
