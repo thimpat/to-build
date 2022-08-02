@@ -74,7 +74,7 @@ const getBooleanOptionValue = (cli, optionName, defaultValue = false) =>
     }
     catch (e)
     {
-        console.error({lid: 1031}, e.message);
+        console.error({lid: 3000}, e.message);
     }
 
     return defaultValue;
@@ -149,7 +149,7 @@ const extractEntities = (content, {
     }
     catch (e)
     {
-        console.error({lid: 1013}, e.message);
+        console.error({lid: 3002}, e.message);
     }
 
     return content;
@@ -165,7 +165,7 @@ const replaceLast = (str, search, replace) =>
     }
     catch (e)
     {
-        console.error({lid: 1015}, e.message);
+        console.error({lid: 3004}, e.message);
     }
 
     return str;
@@ -191,7 +191,7 @@ const makePathRelative = (newUri) =>
     }
     catch (e)
     {
-        console.error({lid: 1017}, e.message);
+        console.error({lid: 3006}, e.message);
     }
 
     return newUri;
@@ -214,7 +214,7 @@ const decorticatePath = (targetPath) =>
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3008}, e.message);
     }
 
     return false;
@@ -238,7 +238,7 @@ const updateHtml = (htmlContent, {entity}) =>
     }
     catch (e)
     {
-        console.error({lid: 1021}, e.message);
+        console.error({lid: 3010}, e.message);
     }
 
     return htmlContent;
@@ -296,7 +296,7 @@ const reviewTargetEntity = async (entity, destFolder, {production = false, minif
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3012}, e.message);
     }
 
     return false;
@@ -353,7 +353,7 @@ const applyChangesFromEntity = async (htmlContent, entity, {alreadyGenerated = f
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3014}, e.message);
     }
 
     return htmlContent;
@@ -387,13 +387,13 @@ const reportResult = ({sourcemaps = false, minified = false, bundled = false, en
 
         let sentence = `${str}copied ${entity.uri}`;
         sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
-        console.log(sentence);
+        console.log({lid: 1000}, sentence);
 
         return true;
     }
     catch (e)
     {
-        console.error({lid: 1023}, e.message);
+        console.error({lid: 3016}, e.message);
     }
 
     return false;
@@ -438,8 +438,8 @@ const minifyCss = async ({
 
         const css = new CleanCSS(cssMinifyingOptions).minify(entity.originalContent);
 
-        // css.warnings && css.warnings.length && console.log(css.warnings.join(os.EOL));
-        css.errors && css.errors.length && console.log(css.errors.join(os.EOL));
+        // css.warnings && css.warnings.length && console.log({lid: 1002}, css.warnings.join(os.EOL));
+        css.errors && css.errors.length && console.log({lid: 1004}, css.errors.join(os.EOL));
 
         // CSS minifying was successful
         if (css && css.styles)
@@ -465,7 +465,7 @@ const minifyCss = async ({
     }
     catch (e)
     {
-        console.error({lid: 1025}, e.message);
+        console.error({lid: 3018}, e.message);
     }
 
     return {htmlContent};
@@ -504,7 +504,7 @@ const minifyJs = async ({
 
         if (result.error)
         {
-            console.error(result.error);
+            console.error({lid: 3020}, result.error);
             return null;
         }
 
@@ -527,7 +527,7 @@ const minifyJs = async ({
     }
     catch (e)
     {
-        console.error({lid: 1027}, e.message);
+        console.error({lid: 3022}, e.message);
     }
 
     return {htmlContent};
@@ -564,7 +564,7 @@ const minifyEsm = async ({
         const result = await transpileFiles(esmOptions);
         if (!result.success)
         {
-            console.error(`Error during ${entity.uri} minification`);
+            console.error({lid: 3024}, `Error during ${entity.uri} minification`);
             return null;
         }
 
@@ -572,7 +572,7 @@ const minifyEsm = async ({
     }
     catch (e)
     {
-        console.error({lid: 1029}, e.message);
+        console.error({lid: 3026}, e.message);
     }
 
     return {htmlContent};
@@ -611,7 +611,7 @@ const copyGeneric = async ({
     }
     catch (e)
     {
-        console.error({lid: 1029}, e.message);
+        console.error({lid: 3028}, e.message);
     }
 
     return null;
@@ -691,7 +691,7 @@ const copyEntity = async (entity, destFolder, htmlContent, {
     }
     catch (e)
     {
-        console.error({lid: 1003}, e.message);
+        console.error({lid: 3030}, e.message);
     }
 
     return {htmlContent};
@@ -722,7 +722,7 @@ const copyEntities = async (category, outputFolder, {
 
             if (!res)
             {
-                console.log(`Failed to copy ${entity.uri} to ${outputFolder}`);
+                console.log({lid: 1006}, `Failed to copy ${entity.uri} to ${outputFolder}`);
                 continue;
             }
 
@@ -731,7 +731,7 @@ const copyEntities = async (category, outputFolder, {
     }
     catch (e)
     {
-        console.error({lid: 1005}, e.message);
+        console.error({lid: 3032}, e.message);
     }
 
     return htmlContent;
@@ -850,7 +850,7 @@ const copyAssetsFromHTML = async (input, outputFolder, {
     }
     catch (e)
     {
-        console.error({lid: 1015}, e.message);
+        console.error({lid: 3034}, e.message);
     }
 
     return null;
@@ -904,7 +904,7 @@ const generateBuild = async (outputFolder, htmlPath, {
     }
     catch (e)
     {
-        console.error({lid: 1017}, e.message);
+        console.error({lid: 3036}, e.message);
     }
 
     return null;
@@ -922,7 +922,7 @@ const stopServer = async ({namespace = "to-build", name = "staging"} = {}) =>
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3038}, e.message);
     }
 
     return false;
@@ -981,13 +981,13 @@ const startDevelopmentServer = async ({port = 10000, noserver = false} = {}) =>
         devDirs.push(...getStaticDirs());
         if (!await startServer({name: "development", dirs: devDirs, dynDirs: ["dynamic"], port, noserver}))
         {
-            console.error(`Failed to start the development server`);
+            console.error({lid: 3044}, `Failed to start the development server`);
         }
         return true;
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3046}, e.message);
     }
 
     return false;
@@ -1011,13 +1011,13 @@ const startStagingServer = async (realOutputFolder, {port = 10002, noserver = fa
 
         if (!await startServer({name: "staging", dirs: stagingDirs, dynDirs: ["dynamic"], port, noserver}))
         {
-            console.error(`Failed to start the staging server`);
+            console.error({lid: 3048}, `Failed to start the staging server`);
         }
         return true;
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3050}, e.message);
     }
 
     return false;
@@ -1041,14 +1041,14 @@ const startProductionServer = async (realOutputFolder, {port = 10004, noserver =
 
         if (!await startServer({name: "production", dirs: productionDirs, dynDirs: ["dynamic"], port, noserver}))
         {
-            console.error(`Failed to start the production server`);
+            console.error({lid: 3052}, `Failed to start the production server`);
         }
 
         return true;
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3054}, e.message);
     }
 
     return false;
@@ -1095,7 +1095,7 @@ const generateTag = (entitiesSpecificsList, outputFolder) =>
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3056}, e.message);
     }
 
     return null;
@@ -1160,7 +1160,7 @@ const buildProductionTargets = ({outputFolder, htmlContent}) =>
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3058}, e.message);
     }
 
     return null;
@@ -1187,7 +1187,7 @@ const generateAllHTMLs = async (inputs, {
         {
             const htmlPath = inputs[i];
 
-            console.log(`Building ${buildType} for ${htmlPath}`);
+            console.log({lid: 1008}, `Building ${buildType} for ${htmlPath}`);
 
             // Add the index.html file directory to the lookup root list
             const htmlInfo = path.parse(htmlPath);
@@ -1236,7 +1236,7 @@ const generateAllHTMLs = async (inputs, {
     }
     catch (e)
     {
-        console.error({lid: 1000}, e.message);
+        console.error({lid: 3060}, e.message);
     }
 
     return null;
@@ -1324,7 +1324,7 @@ const generateAllHTMLs = async (inputs, {
     }
     catch (e)
     {
-        console.error({lid: 1021}, e.message);
+        console.error({lid: 3062}, e.message);
     }
 
     return false;
