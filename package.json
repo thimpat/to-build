@@ -11,10 +11,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@mycentos.local:thimpat-group/to-build.git"
+    "url": "https://github.com/thimpat/to-build.git"
   },
   "author": "Patrice Thimothee",
   "license": "ISC",
+  "keywords": [
+    "productivity"
+  ],
   "devDependencies": {
     "eslint": "^8.20.0",
     "rimraf": "^3.0.2"
