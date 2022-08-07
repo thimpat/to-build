@@ -22,12 +22,6 @@ $> npm install to-build
 
 <br/>
 
-## Note
-
-> to-build is at an experimental level
-
-<br/>
-
 ## Usage
 
 
