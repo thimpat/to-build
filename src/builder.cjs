@@ -1184,6 +1184,19 @@ const buildProductionTargets = ({outputFolder, htmlContent}) =>
     return null;
 };
 
+/**
+ * Generate build for passed HTML files
+ * @param inputs
+ * @param root
+ * @param outputFolder
+ * @param minifyHtml
+ * @param minifyCss
+ * @param minifyJs
+ * @param sourcemaps
+ * @param isProduction
+ * @param noserver
+ * @returns {Promise<{outputFolder: *, htmlContent: (string|null)}|null>}
+ */
 const generateAllHTMLs = async (inputs, {
     root,
     outputFolder,
@@ -1227,13 +1240,15 @@ const generateAllHTMLs = async (inputs, {
                 buildType
             });
 
+            const targetHtmlPath = joinPath(result.outputFolder, htmlInfo.base);
             if (isProduction)
             {
-                fs.writeFileSync("./out/production/index-debug.html", result.htmlContent, "utf-8");
+
+                fs.writeFileSync(targetHtmlPath, result.htmlContent, "utf-8");
                 result.htmlContent = buildProductionTargets(result);
+                continue;
             }
 
-            const targetHtmlPath = joinPath(result.outputFolder, htmlInfo.base);
             fs.writeFileSync(targetHtmlPath, result.htmlContent, "utf-8");
 
         }
