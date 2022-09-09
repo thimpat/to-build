@@ -1,6 +1,6 @@
 {
   "name": "to-build",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Code Builder",
   "main": "src/builder.cjs",
   "bin": {
