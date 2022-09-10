@@ -72,11 +72,20 @@ const setRoots = (htmlPathFolder, roots ) =>
     return false;
 };
 
+/**
+ * Returns all user directories created from the --root options
+ * @returns {*[]}
+ */
 const getRoots = () =>
 {
     return rootFolders;
 };
 
+/**
+ * Set user static directories defined by the user with the --static option
+ * @param dirs
+ * @returns {boolean|*[]}
+ */
 const setStaticDirs = (dirs) =>
 {
     try
@@ -122,11 +131,21 @@ const setStaticDirs = (dirs) =>
     return false;
 };
 
+/**
+ * Returns static directory list defined by the user
+ * @returns {*[]}
+ */
 const getStaticDirs = () =>
 {
     return staticFolders;
 };
 
+/**
+ * Generate pathname from url in a format O.S. path compliant
+ * @param uri
+ * @param withTrailingSlash
+ * @returns {string|null}
+ */
 const getPathName = (uri, {withTrailingSlash = true} = {}) =>
 {
     try
@@ -144,7 +163,7 @@ const getPathName = (uri, {withTrailingSlash = true} = {}) =>
 
         if (!withTrailingSlash)
         {
-            if (result.pathname.charAt(0) === "/")
+            if (result.pathname.startsWith("/"))
             {
                 return result.pathname.substring(1);
             }
@@ -160,9 +179,12 @@ const getPathName = (uri, {withTrailingSlash = true} = {}) =>
 };
 
 /**
- * Look for uri in various folders
- * - node_modules
- * - folders defined with --root folder option
+ * Try to find the matching value for the given uri on disk
+ * Lookup is done in this order
+ * 1- Current working directory
+ * 2- folders defined by the user with the --root folder option
+ * 3- node_modules added automatically to the --root variable
+ * @see setRoots
  * @param uri
  * @returns {null|*}
  */
@@ -207,6 +229,11 @@ const lookupRootPath = (uri) =>
     return null;
 };
 
+/**
+ * Lookup for the given uri in the static directories defined by the user with the --static options
+ * @param uri
+ * @returns {null|{rootFolder: *, sourcePath: (*)}}
+ */
 const lookupStaticPath = (uri) =>
 {
     if (!uri)
