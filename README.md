@@ -43,21 +43,20 @@ $> to-build src/index.html
 
 ## Options
 
-| **Options**   | **Description**                                          | **Expect** |
-|---------------|----------------------------------------------------------|------------|
-| --development | _Only launch the server against your development folder_ | boolean    |
-| --staging     | _Do a build for staging_                                 | boolean    |
-| --production  | _Do a build for production_                              | boolean    |
-| --all         | _Do a build for staging and production at once_          | boolean    |
-| --noserver    | _Do not run servers after builds_                        | boolean    |  
-| --output      | _The folder to hold the build_                           | string     |  
-| --static      | _Folder for assets or public_                            | string     |  
-| --root        | _Extra folders to resolve paths_                         | string     |  
-| --minifyCss   | _Whether to minify css_                                  | boolean    |  
-| --minifyJs    | _Whether to minify js_                                   | boolean    |  
-| --minifyHtml  | _Whether to minify html_                                 | boolean    |  
-| --sourcemaps  | _Whether to generate sourcemaps_                         | boolean    |  
-
+| **Options**   | **Description**                                                                                                                               | **Expect** | Default                                                         |
+|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------|------------|-----------------------------------------------------------------|
+| --development | _Only launch the server against your development folder_                                                                                      | boolean    |                                                                 |
+| --staging     | _Do a build for staging_                                                                                                                      | boolean    |                                                                 |
+| --production  | _Do a build for production_                                                                                                                   | boolean    |                                                                 |
+| --all         | _Do a build for staging and production at once_                                                                                               | boolean    |                                                                 |
+| --noserver    | _Do not run servers after builds_                                                                                                             | boolean    |                                                                 |
+| --output      | _The folder to hold the build_                                                                                                                | string     |                                                                 |
+| --root        | _Folders the engine will look up to, to resolve extracted uris <br/>including the current working <br/>directory and the node_modules folder_ | string[]   | [<current working dir><br/>, user defined<br/>, <node_modules>] |
+| --static      | _Extra Folders the engine will look up to, to resolve extracted uris if not found in the --root ones_                                         | string[]   |                                                                 |
+| --minifyCss   | _Whether to minify css_                                                                                                                       | boolean    |                                                                 |
+| --minifyJs    | _Whether to minify js_                                                                                                                        | boolean    |                                                                 |
+| --minifyHtml  | _Whether to minify html_                                                                                                                      | boolean    |                                                                 |
+| --sourcemaps  | _Whether to generate sourcemaps_                                                                                                              | boolean    |                                                                 |
 
 * Sourcemaps are not generated in production
 
