@@ -81,7 +81,8 @@ const getBooleanOptionValue = (cli, optionName, defaultValue = false) =>
 };
 
 /**
- * Extract uris from the given source code and create some objects from them
+ * Extract uris and tags from the given source code and create some objects from it (ENTITY_TYPE)
+ * and add them to two bags (entities[category] and lookup[url])
  * @param {string} content Source code to parse
  * @param {string} search String for the regex that will do the search. The regex must contain
  * one subgroup that points to the url to extract to be valid. When search is defined, the internal
@@ -123,6 +124,11 @@ const extractEntities = (content, {
 
         for (const match of matches)
         {
+            /**
+             * Contains the extracted full tag code
+             * @example "<link href="./some/paths/some.css" rel="stylesheet" />"
+             * @type {string}
+             */
             const tag = match[0].toLowerCase();
             if (extraProperty)
             {
@@ -133,8 +139,14 @@ const extractEntities = (content, {
                 }
             }
 
+            /**
+             * Contains the url extracted from the tag
+             * @example. "<link href="./some/paths/some.css" rel="stylesheet" />"
+             * => url = "./some/paths/some.css"
+             * @type {string}
+             */
             const uri = match[1];
-
+            console.log({lid: 1234, symbol: "black_medium_square"}, `Solving: ${uri}`);
 
             const added = addEntity(category, {tag, uri}, referenceDir);
             if (!added)
@@ -316,7 +328,8 @@ const reviewTargetEntity = async (entity, destFolder, {production = false, minif
 };
 
 /**
- * Update html file content based on entity object content
+ * Save minification and source maps to disk
+ * Restore tags that the entity object has removed during the parsing to the processed source code
  * @param htmlContent
  * @param entity
  * @param alreadyGenerated
@@ -361,7 +374,7 @@ const applyChangesFromEntity = async (htmlContent, entity, {alreadyGenerated = f
             }
         }
 
-        // Update the path in the html file
+        // Restore tags in the html file
         htmlContent = updateHtml(htmlContent, {entity});
         reportResult({entity});
     }

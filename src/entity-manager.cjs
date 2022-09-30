@@ -30,11 +30,26 @@ const CATEGORY = {
  * @param string
  * @returns {boolean}
  */
-const isUrl = string => {
-    try { return Boolean(new URL(string)); }
-    catch(e){ return false; }
+const isUrl = string =>
+{
+    try
+    {
+        return Boolean(new URL(string));
+    }
+    catch (e)
+    {
+        return false;
+    }
 };
 
+/**
+ * An entity here is an object that keeps various information related to a tag (link, script, etc)
+ * extracted from the code source.
+ * @param category
+ * @param {ENTITY_TYPE} entity
+ * @param referenceDir
+ * @returns {{replacement: string}|null}
+ */
 const addEntity = (category, entity, referenceDir = "") =>
 {
     try
