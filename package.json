@@ -1,6 +1,6 @@
 {
   "name": "to-build",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Code Builder",
   "main": "src/builder.cjs",
   "bin": {
@@ -11,23 +11,26 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@mycentos.local:thimpat-group/to-build.git"
+    "url": "https://github.com/thimpat/to-build.git"
   },
   "author": "Patrice Thimothee",
-  "license": "ISC",
+  "license": "MIT",
+  "keywords": [
+    "productivity"
+  ],
   "devDependencies": {
     "eslint": "^8.20.0",
     "rimraf": "^3.0.2"
   },
   "dependencies": {
-    "@thimpat/libutils": "^1.4.2",
-    "analogger": "^1.17.2",
+    "@thimpat/libutils": "^1.10.6",
+    "analogger": "^1.20.4",
     "clean-css": "^4.2.4",
-    "genserve": "^2.0.3-beta.0",
+    "genserve": "^3.11.0",
     "html-minifier": "^4.0.0",
     "minimist": "^1.2.6",
     "strip-html-comments": "^1.0.0",
-    "to-esm": "^2.18.0",
+    "to-esm": "^2.23.2",
     "uglify-js": "^3.16.3"
   }
 }
