@@ -341,10 +341,10 @@ const applyChangesFromEntity = async (htmlContent, entity, {alreadyGenerated = f
 {
     try
     {
-        if (!deployImmediately)
-        {
-            return htmlContent;
-        }
+        // if (!deployImmediately)
+        // {
+        //     return htmlContent;
+        // }
 
         if (!fs.existsSync(entity.targetDir))
         {
@@ -980,7 +980,7 @@ const startServer = async ({
     {
         if (noserver)
         {
-            return;
+            return true;
         }
 
         if (!await stopServer({namespace, name}))
@@ -1255,13 +1255,15 @@ const generateAllHTMLs = async (inputs, {
                 buildType
             });
 
+            const targetHtmlPath = joinPath(result.outputFolder, htmlInfo.base);
             if (isProduction)
             {
-                fs.writeFileSync("./out/production/index-debug.html", result.htmlContent, "utf-8");
+
+                fs.writeFileSync(targetHtmlPath, result.htmlContent, "utf-8");
                 result.htmlContent = buildProductionTargets(result);
+                continue;
             }
 
-            const targetHtmlPath = joinPath(result.outputFolder, htmlInfo.base);
             fs.writeFileSync(targetHtmlPath, result.htmlContent, "utf-8");
 
         }
@@ -1327,10 +1329,21 @@ const generateAllHTMLs = async (inputs, {
         const minifyCss = getBooleanOptionValue(cli, "minifyCss", true);
         const minifyJs = getBooleanOptionValue(cli, "minifyJs", true);
         const sourcemaps = getBooleanOptionValue(cli, "sourcemaps", true);
-        const development = getBooleanOptionValue(cli, "development", false);
-        const staging = getBooleanOptionValue(cli, "staging", false);
-        const production = getBooleanOptionValue(cli, "production", false);
+        let development = getBooleanOptionValue(cli, "development", false);
+        let staging = getBooleanOptionValue(cli, "staging", false);
+        let production = getBooleanOptionValue(cli, "production", false);
         const noserver = getBooleanOptionValue(cli, "noserver", false);
+        const all = getBooleanOptionValue(cli, "all", false);
+
+        if (!(development || staging || production))
+        {
+            staging = true;
+        }
+
+       if (all)
+        {
+            development = staging = production = true;
+        }
 
         const root = cli.root;
 

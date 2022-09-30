@@ -1,4 +1,3 @@
-
 const fs = require("fs");
 
 const {joinPath} = require("@thimpat/libutils");
@@ -121,13 +120,17 @@ const addEntity = (category, entity, referenceDir = "") =>
                     return null;
                 }
 
-                if (lookupStaticPath(entity.uri))
+                if (!lookupStaticPath(entity.uri))
                 {
-                    console.log(`[${entity.uri}] is in the public directory. No action taken`);
+                    console.error({lid: 3075}, `Failed: Could not find a match on disk for [${entity.uri}]`);
+                    if (!console.hasSeenLid(3077))
+                    {
+                        console.error({lid: 3077}, `Use the --root option to add more directories for the search or use the --static options if the resource is located in a static folder`);
+                    }
                     return null;
                 }
 
-                console.error(`Could not find local matching path for [${entity.uri}]. Skipping`);
+                console.log(`[${entity.uri}] is in the public directory. No action taken`);
                 return null;
             }
         }
@@ -153,7 +156,7 @@ const addEntity = (category, entity, referenceDir = "") =>
         entity.replacement = replacement;
         entity.originalUri = entity.uri;
 
-        return {replacement};
+        return {replacement, sourcePath, tagID};
     }
     catch (e)
     {
