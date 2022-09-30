@@ -22,12 +22,6 @@ $> npm install to-build
 
 <br/>
 
-## Note
-
-> to-build is at an experimental level
-
-<br/>
-
 ## Usage
 
 
@@ -49,26 +43,50 @@ $> to-build src/index.html
 
 ## Options
 
-| **Options**   | **Description**                                          | **Expect** |
-|---------------|----------------------------------------------------------|------------|
-| --development | _Only launch the server against your development folder_ | boolean    |
-| --staging     | _Do a build for staging_                                 | boolean    |
-| --production  | _Do a build for production_                              | boolean    |
-| --all         | _Do a build for staging and production at once_          | boolean    |
-| --noserver    | _Do not run servers after builds_                        | boolean    |  
-| --output      | _The folder to hold the build_                           | string     |  
-| --static      | _Folder for assets or public_                            | string     |  
-| --root        | _Extra folders to resolve paths_                         | string     |  
-| --minifyCss   | _Whether to minify css_                                  | boolean    |  
-| --minifyJs    | _Whether to minify js_                                   | boolean    |  
-| --minifyHtml  | _Whether to minify html_                                 | boolean    |  
-| --sourcemaps  | _Whether to generate sourcemaps_                         | boolean    |  
-
+| **Options**   | **Description**                                                                                                                               | **Expect** | Default                                                         |
+|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------|------------|-----------------------------------------------------------------|
+| --development | _Only launch the server against your development folder_                                                                                      | boolean    |                                                                 |
+| --staging     | _Do a build for staging_                                                                                                                      | boolean    |                                                                 |
+| --production  | _Do a build for production_                                                                                                                   | boolean    |                                                                 |
+| --all         | _Do a build for staging and production at once_                                                                                               | boolean    |                                                                 |
+| --noserver    | _Do not run servers after builds_                                                                                                             | boolean    |                                                                 |
+| --output      | _The folder to hold the build_                                                                                                                | string     |                                                                 |
+| --root        | _Folders the engine will look up to, to resolve extracted uris <br/>including the current working <br/>directory and the node_modules folder_ | string[]   | [<current working dir><br/>, user defined<br/>, <node_modules>] |
+| --static      | _Extra Folders the engine will look up to, to resolve extracted uris if not found in the --root ones_                                         | string[]   |                                                                 |
+| --minifyCss   | _Whether to minify css_                                                                                                                       | boolean    |                                                                 |
+| --minifyJs    | _Whether to minify js_                                                                                                                        | boolean    |                                                                 |
+| --minifyHtml  | _Whether to minify html_                                                                                                                      | boolean    |                                                                 |
+| --sourcemaps  | _Whether to generate sourcemaps_                                                                                                              | boolean    |                                                                 |
 
 * Sourcemaps are not generated in production
 
 
 <br/>
+
+
+## Servers
+
+By default, the development server runs on port 10000, staging on port 10002 and production on port 10004.
+
+**To have a quick report:**
+
+```shell
+$> npx genserve scan --namespace to-build
+```
+
+**To edit ports, locate the configuration file with:**
+
+```shell
+# To get the servers configuration path 
+$> npx genserve path servers --namespace to-build
+```
+
+**To stop servers**
+
+```shell
+$> npx genserve stop all --namespace to-build
+```
+
 
 
 ## Examples
