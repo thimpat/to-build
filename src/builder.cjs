@@ -154,6 +154,7 @@ const extractEntities = (content, {
                 continue;
             }
 
+            console.log({lid: 1236, symbol: "check"}, `Solved ${uri} with ${added.sourcePath}`);
             content = content.replace(tag, added.replacement);
         }
 
@@ -645,13 +646,13 @@ const copyGeneric = async ({
 };
 
 /**
- * Copy an uri to the target folder
+ * Process an entity object to generate their target on disk after minification,
+ * then restore back the modified part from the processed source
  * @param uri
- * @param entity
+ * @param {ENTITY_TYPE} entity
  * @param destFolder
  * @param htmlContent
  * @param minify
- * @param entity
  * @param destFolder
  * @param htmlContent
  * @param minify
@@ -725,7 +726,8 @@ const copyEntity = async (entity, destFolder, htmlContent, {
 };
 
 /**
- * Copy an array of uris to the target folder
+ * Parse the list of saved entities objects to minify their targets and save them on disk,
+ * then restore the modified part from the processed string
  * @param uris
  * @param category
  * @param htmlContent
@@ -962,6 +964,7 @@ const stopServer = async ({namespace = "to-build", name = "staging"} = {}) =>
  * @param name
  * @param port
  * @param dynDirs
+ * @param noserver
  * @returns {Promise<*>}
  */
 const startServer = async ({
@@ -1196,6 +1199,19 @@ const buildProductionTargets = ({outputFolder, htmlContent}) =>
     return null;
 };
 
+/**
+ * Generate build for passed HTML files
+ * @param inputs
+ * @param root
+ * @param outputFolder
+ * @param minifyHtml
+ * @param minifyCss
+ * @param minifyJs
+ * @param sourcemaps
+ * @param isProduction
+ * @param noserver
+ * @returns {Promise<{outputFolder: *, htmlContent: (string|null)}|null>}
+ */
 const generateAllHTMLs = async (inputs, {
     root,
     outputFolder,
@@ -1277,8 +1293,11 @@ const generateAllHTMLs = async (inputs, {
     try
     {
         anaLogger.setOptions({silent: false, hideError: false, hideHookMessage: true, lidLenMax: 4});
-        anaLogger.overrideConsole();
+        anaLogger.overrideConsole({});
         anaLogger.overrideError();
+        anaLogger.setDefaultContext({color: "#a4985e"});
+
+        console.keepLogHistory();
 
         const cli = parseCli(process.argv);
 

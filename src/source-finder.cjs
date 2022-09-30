@@ -163,7 +163,7 @@ const getPathName = (uri, {withTrailingSlash = true} = {}) =>
 
         if (!withTrailingSlash)
         {
-            if (result.pathname.charAt(0) === "/")
+            if (result.pathname.startsWith("/"))
             {
                 return result.pathname.substring(1);
             }
