@@ -156,3 +156,34 @@ $> to-build src/index.html --development
 
 
 
+
+
+## Changelog
+
+##### current:
+*  Add the directive [to-build remove] to remove code from generated html files
+*  Fix generated html
+*  Fix files containing special characters in uris not processed
+*  Add one second pause after starting a server
+*  Remove duplicated log ids
+*  Do not start all builds automatically
+*  Use AnaLogger module to display logs
+*  Add --noserver option to prevent launching servers automatically
+*  Run all servers at start
+*  Fix generation for production assets
+*  Generate build for production
+*  Add --static options to add extras static directories
+*  Scan css to add more linked files to the build directory
+*  Start server after build
+*  Add missing library source-finder
+*  Fix build missing resource files
+*  Fix build generation for script module types
+*  Minify module type js with to-esm
+*  Minify HTML
+*  Generate css files with options from html
+*  Fix missing css files processing
+*  Run from CLI
+
+
+
+---
