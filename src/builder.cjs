@@ -1368,7 +1368,7 @@ const generateAllHTMLs = async (inputs, {
             staging = true;
         }
 
-       if (all)
+        if (all)
         {
             development = staging = production = true;
         }
