@@ -415,7 +415,7 @@ const reportResult = ({sourcemaps = false, minified = false, bundled = false, en
 
         let sentence = `${str}copied ${entity.uri}`;
         sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
-        console.log({lid: 1000}, sentence);
+        console.log({lid: 3014}, sentence);
 
         return true;
     }
