@@ -782,12 +782,14 @@ const copyAssetsFromHTML = async (input, outputFolder, {
     minifyCss = false,
     minifyJs = false,
     sourcemaps = false,
+    buildType,
     production = false
 } = {}) =>
 {
     try
     {
         let htmlContent = fs.readFileSync(input, "utf-8");
+        htmlContent = reviewHTML(htmlContent, buildType);
         htmlContent = stripHtmlComments(htmlContent);
 
         if (minifyHtml)
@@ -926,6 +928,7 @@ const generateBuild = async (outputFolder, htmlPath, {
             minifyCss,
             minifyJs,
             sourcemaps,
+            buildType,
             production: buildType === "production"
         });
 
@@ -1193,11 +1196,34 @@ const buildProductionTargets = ({outputFolder, htmlContent}) =>
     }
     catch (e)
     {
-        console.error({lid: 3058}, e.message);
+        console.error({lid: 3057}, e.message);
     }
 
     return null;
 };
+
+function reviewHTML(htmlContent, buildType)
+{
+    try
+    {
+        const startComment = `<!--\\s*to-build\\s+remove\\s+${buildType}\\s*-->`;
+        const endComment = `<!--\\s*\\/to-build\\s+remove\\s+${buildType}\\s*-->`;
+
+        const regex = new RegExp(`${startComment}.*${endComment}`, "gis");
+        const stripped = htmlContent.replace(regex, "");
+        if (stripped !== htmlContent)
+        {
+            console.log(`to-build directive applied`);
+        }
+        return stripped;
+    }
+    catch (e)
+    {
+        console.error({lid: 3059}, e.message);
+    }
+
+    return htmlContent
+}
 
 /**
  * Generate build for passed HTML files
@@ -1254,6 +1280,8 @@ const generateAllHTMLs = async (inputs, {
                 sourcemaps,
                 buildType
             });
+
+            result.htmlContent = reviewHTML(result.htmlContent, buildType);
 
             const targetHtmlPath = joinPath(result.outputFolder, htmlInfo.base);
             if (isProduction)
@@ -1365,6 +1393,7 @@ const generateAllHTMLs = async (inputs, {
                 minifyJs,
                 sourcemaps,
                 isProduction: false,
+                buildType: "staging",
                 noserver
             });
         }
@@ -1378,6 +1407,7 @@ const generateAllHTMLs = async (inputs, {
                 minifyCss,
                 minifyJs,
                 sourcemaps,
+                buildType: "production",
                 isProduction: true,
                 noserver
             });
